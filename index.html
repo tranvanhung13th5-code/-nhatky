@@ -93,6 +93,12 @@
                 </div>
 
                 <div>
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5"><i class="fa-solid fa-paperclip mr-1"></i> Đính kèm (Ảnh/Ghi âm - Dưới 1MB)</label>
+                    <input type="file" id="mediaInput" accept="image/*, audio/*"
+                           class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 rounded-xl px-3 py-2 text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-pink-500/10 file:text-pink-400 hover:file:bg-pink-500/20 transition outline-none cursor-pointer">
+                </div>
+
+                <div>
                     <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5"><i class="fa-solid fa-palette mr-1"></i> Chọn chủ đề cảm xúc</label>
                     <div class="grid grid-cols-3 gap-2">
                         <label class="cursor-pointer">
@@ -243,6 +249,8 @@
                 <h2 id="letterFor" class="text-2xl font-bold font-serif-custom text-slate-100 mt-2">Gửi Bé Yêu ✨</h2>
             </div>
 
+            <div id="mediaContainer" class="mb-4 flex justify-center relative z-10 hidden"></div>
+
             <div class="bg-slate-950/40 p-5 rounded-2xl border border-slate-800/50 mb-6 relative z-10">
                 <p id="letterContent" class="text-sm text-slate-300 leading-relaxed font-serif-custom italic whitespace-pre-line">
                     ...
@@ -291,6 +299,16 @@
         let currentPinInput = "";
         let secretLetterId = null; 
         let loadedLetterData = null; 
+
+        // Hàm hỗ trợ chuyển đổi File sang Base64 để lưu thẳng vào Firestore
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
 
         // 2. Chạy khi mở trang để phân tích đường dẫn URL
         async function initPage() {
@@ -359,6 +377,7 @@
             const pin = document.getElementById("pinInput").value.trim();
             const securityQuestion = document.getElementById("securityQuestionInput").value.trim();
             const securityAnswer = document.getElementById("securityAnswerInput").value.trim();
+            const mediaFile = document.getElementById("mediaInput").files[0]; // Lấy file đính kèm
             
             const btnSubmit = document.getElementById("btnSubmitForm");
             const btnText = document.getElementById("btnSubmitText");
@@ -387,6 +406,22 @@
                 // Lấy chủ đề cảm xúc được chọn
                 const theme = document.querySelector('input[name="themeSelect"]:checked').value;
 
+                let mediaUrl = null;
+                let mediaType = null;
+
+                // Nếu có file đính kèm, mã hóa sang Base64 để lưu trực tiếp, bỏ qua Storage CORS
+                if (mediaFile) {
+                    if (mediaFile.size > 1048576) { // 1MB Limit để bảo toàn Firestore dung lượng
+                        alert("Vui lòng chọn ảnh hoặc file ghi âm dưới 1MB để tối ưu dung lượng lưu trữ!");
+                        btnSubmit.disabled = false;
+                        btnSubmit.classList.remove("opacity-70", "cursor-wait");
+                        btnText.innerText = "Tạo Liên Kết Khóa PIN";
+                        return;
+                    }
+                    mediaUrl = await fileToBase64(mediaFile);
+                    mediaType = mediaFile.type;
+                }
+
                 // Lưu thư vào Firestore
                 const docData = {
                     recipient: recipient,
@@ -398,6 +433,12 @@
                     status: "unread", // Mặc định là chưa xem
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
+
+                // Nếu có media, tích hợp vào Database
+                if (mediaUrl) {
+                    docData.mediaUrl = mediaUrl;
+                    docData.mediaType = mediaType;
+                }
 
                 const docRef = await db.collection("messages").add(docData);
 
@@ -429,6 +470,7 @@
             document.getElementById("pinInput").value = "";
             document.getElementById("securityQuestionInput").value = "";
             document.getElementById("securityAnswerInput").value = "";
+            document.getElementById("mediaInput").value = ""; // Reset file input
             document.querySelector('input[name="themeSelect"][value="love"]').checked = true;
 
             document.getElementById("successResult").classList.add("hidden");
@@ -596,7 +638,21 @@
                 document.getElementById("letterFor").innerText = `Gửi ${loadedLetterData.recipient} ✨`;
                 document.getElementById("letterContent").innerText = loadedLetterData.content;
                 
-                // 4. Áp dụng phong cách thiết kế theo "Giao diện cảm xúc" được chọn
+                // 4. Hiển thị ảnh / audio lưu dạng Base64
+                const mediaContainer = document.getElementById("mediaContainer");
+                if (loadedLetterData.mediaUrl) {
+                    mediaContainer.classList.remove("hidden");
+                    if (loadedLetterData.mediaType.startsWith('image/')) {
+                        mediaContainer.innerHTML = `<img src="${loadedLetterData.mediaUrl}" class="rounded-xl max-h-64 object-cover border border-slate-700/50 shadow-lg" alt="Kỷ niệm">`;
+                    } else if (loadedLetterData.mediaType.startsWith('audio/')) {
+                        mediaContainer.innerHTML = `<audio controls src="${loadedLetterData.mediaUrl}" class="w-full h-10 rounded-lg outline-none"></audio>`;
+                    }
+                } else {
+                    mediaContainer.classList.add("hidden");
+                    mediaContainer.innerHTML = "";
+                }
+
+                // 5. Áp dụng phong cách thiết kế theo "Giao diện cảm xúc" được chọn
                 const theme = loadedLetterData.theme || 'love';
                 const letterScreen = document.getElementById("letterScreen");
                 const themeIcon = document.querySelector("#letterScreen .absolute i"); 
@@ -629,11 +685,11 @@
                     confettiColors = ['#ec4899', '#a855f7', '#ffffff'];
                 }
 
-                // 5. Hiển thị trang Thư với hiệu ứng CSS Mở thư (envelope-open-anim)
+                // 6. Hiển thị trang Thư với hiệu ứng CSS Mở thư (envelope-open-anim)
                 letterScreen.classList.remove("hidden");
                 letterScreen.classList.add("envelope-open-anim");
 
-                // 6. Bắn Pháo hoa chúc mừng bằng thư viện canvas-confetti
+                // 7. Bắn Pháo hoa chúc mừng bằng thư viện canvas-confetti
                 var duration = 3 * 1000;
                 var end = Date.now() + duration;
 
@@ -705,4 +761,3 @@
     </script>
 </body>
 </html>
-  
