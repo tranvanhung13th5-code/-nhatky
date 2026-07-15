@@ -4,16 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hộp Thư Bí Mật Khóa PIN 💌</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,700;1,400&display=swap" rel="stylesheet">
-    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Firebase SDK (Compat v10 CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 
     <style>
         body {
@@ -51,11 +50,19 @@
         ::-webkit-scrollbar-thumb:hover {
             background: rgba(217, 70, 239, 0.6);
         }
+        
+        /* Hiệu ứng mở thư */
+        .envelope-open-anim {
+            animation: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes slideUpFade {
+            0% { opacity: 0; transform: translateY(40px) scale(0.95); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
     </style>
 </head>
 <body class="text-slate-100 min-h-screen flex items-center justify-center p-4 selection:bg-pink-500 selection:text-white">
 
-    <!-- LOADING SCREEN -->
     <div id="loadingScreen" class="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-50 transition-opacity duration-300">
         <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-pink-500 mb-4"></div>
         <p class="text-slate-400 text-sm animate-pulse">Đang kết nối thư viện bảo mật...</p>
@@ -63,7 +70,6 @@
 
     <div class="w-full max-w-md my-8">
 
-        <!-- SCREEN 1: GIAO DIỆN SOẠN THƯ (Khi truy cập link gốc không có ID) -->
         <div id="creatorScreen" class="glass-panel rounded-3xl p-6 shadow-2xl hidden">
             <div class="text-center mb-6">
                 <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-pink-500/10 text-pink-400 text-2xl mb-3 border border-pink-500/20 shadow-inner">
@@ -73,7 +79,6 @@
                 <p class="text-xs text-slate-400 mt-1">Viết điều muốn nhắn gửi & thiết lập mã PIN 6 số</p>
             </div>
 
-            <!-- Form tạo thư -->
             <div id="createForm" class="space-y-4">
                 <div>
                     <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Người nhận</label>
@@ -88,17 +93,22 @@
                 </div>
 
                 <div>
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5"><i class="fa-solid fa-paperclip mr-1"></i> Đính kèm (Ảnh/Ghi âm - Tùy chọn)</label>
+                    <input type="file" id="mediaInput" accept="image/*, audio/*"
+                           class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 rounded-xl px-3 py-2 text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-pink-500/10 file:text-pink-400 hover:file:bg-pink-500/20 transition outline-none cursor-pointer">
+                </div>
+
+                <div>
                     <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Đặt mã bảo mật PIN (Đúng 6 số)</label>
                     <input type="password" id="pinInput" placeholder="Ví dụ: 121204 (không chứa ký tự chữ)" maxlength="6" pattern="[0-9]*" inputmode="numeric"
                            class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 placeholder-slate-600 tracking-widest outline-none transition">
                 </div>
 
-                <button onclick="createNewLetter()" class="w-full py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-pink-500/20 flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-paper-plane"></i> Tạo Liên Kết Khóa PIN
+                <button id="btnSubmitForm" onclick="createNewLetter()" class="w-full py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-pink-500/20 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-paper-plane"></i> <span id="btnSubmitText">Tạo Liên Kết Khóa PIN</span>
                 </button>
             </div>
 
-            <!-- Kết quả khi tạo thành công -->
             <div id="successResult" class="hidden space-y-4 py-4 animate-fade-in">
                 <div class="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
                     <i class="fa-solid fa-circle-check text-emerald-400 text-3xl mb-2"></i>
@@ -119,17 +129,15 @@
                 </button>
             </div>
 
-            <!-- Lịch sử thư đã tạo (Lưu nội bộ trên máy người gửi) -->
             <div id="historyBox" class="mt-6 pt-6 border-t border-slate-800/80">
-                <h4 class="text-[11px] font-bold text-slate-500 tracking-wider uppercase mb-3"><i class="fa-solid fa-clock-rotate-left mr-1"></i> Thư bạn đã tạo gần đây</h4>
-                <div id="historyList" class="space-y-2 max-h-[150px] overflow-y-auto pr-1">
+                <h4 class="text-[11px] font-bold text-slate-500 tracking-wider uppercase mb-3"><i class="fa-solid fa-clock-rotate-left mr-1"></i> Trạng thái thư đã gửi</h4>
+                <div id="historyList" class="space-y-2 max-h-[160px] overflow-y-auto pr-1">
                     <p class="text-[10px] text-slate-600 text-center py-2">Chưa có lịch sử tạo thư.</p>
                 </div>
             </div>
         </div>
 
 
-        <!-- SCREEN 2: MÀN HÌNH KHÓA PIN 6 SỐ (Hiện khi người nhận mở link chia sẻ) -->
         <div id="lockScreen" class="glass-panel rounded-3xl p-8 shadow-2xl hidden">
             <div class="text-center mb-8">
                 <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-pink-500/10 text-pink-400 text-3xl mb-4 border border-pink-500/20 shadow-inner">
@@ -139,7 +147,6 @@
                 <p id="lockSubtitle" class="text-xs text-slate-400 mt-1">Nhập mã PIN 6 số từ người gửi để mở thư</p>
             </div>
 
-            <!-- Indicator hiển thị 6 chấm tròn mật khẩu -->
             <div class="flex justify-center gap-3 mb-8">
                 <span class="pin-dot w-4 h-4 rounded-full border border-slate-600 bg-slate-800"></span>
                 <span class="pin-dot w-4 h-4 rounded-full border border-slate-600 bg-slate-800"></span>
@@ -149,7 +156,6 @@
                 <span class="pin-dot w-4 h-4 rounded-full border border-slate-600 bg-slate-800"></span>
             </div>
 
-            <!-- Bàn phím số ảo -->
             <div class="grid grid-cols-3 gap-4 max-w-[280px] mx-auto mb-4">
                 <button onclick="pressKey('1')" class="h-14 w-14 rounded-full bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/30 text-lg font-semibold transition active:scale-95 focus:outline-none">1</button>
                 <button onclick="pressKey('2')" class="h-14 w-14 rounded-full bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/30 text-lg font-semibold transition active:scale-95 focus:outline-none">2</button>
@@ -171,28 +177,28 @@
         </div>
 
 
-        <!-- SCREEN 3: MÀN HÌNH ĐỌC THƯ (Chỉ mở ra khi nhập đúng PIN 6 số) -->
-        <div id="letterScreen" class="glass-panel rounded-3xl p-8 shadow-2xl hidden relative overflow-hidden animate-fade-in">
-            <!-- Trực quan hóa hình trái tim chìm cực đẹp -->
+        <div id="letterScreen" class="glass-panel rounded-3xl p-8 shadow-2xl hidden relative overflow-hidden">
             <div class="absolute -top-6 -right-6 text-pink-500/10 text-8xl pointer-events-none select-none">
                 <i class="fa-solid fa-heart"></i>
             </div>
             
-            <div class="border-b border-pink-500/20 pb-4 mb-6">
+            <div class="border-b border-pink-500/20 pb-4 mb-6 relative z-10">
                 <div class="flex items-center gap-2 text-pink-400 text-xs font-bold tracking-widest uppercase">
-                    <i class="fa-solid fa-envelope animate-pulse"></i> Thư mật dành riêng cho bạn
+                    <i class="fa-solid fa-envelope-open-text animate-pulse"></i> Thư mật dành riêng cho bạn
                 </div>
                 <h2 id="letterFor" class="text-2xl font-bold font-serif-custom text-slate-100 mt-2">Gửi Bé Yêu ✨</h2>
             </div>
 
-            <!-- Nội dung bức thư -->
-            <div class="bg-slate-950/40 p-5 rounded-2xl border border-slate-800/50 mb-6">
+            <div id="mediaContainer" class="mb-4 flex justify-center relative z-10 hidden">
+                </div>
+
+            <div class="bg-slate-950/40 p-5 rounded-2xl border border-slate-800/50 mb-6 relative z-10">
                 <p id="letterContent" class="text-sm text-slate-300 leading-relaxed font-serif-custom italic whitespace-pre-line">
                     ...
                 </p>
             </div>
 
-            <div class="space-y-3">
+            <div class="space-y-3 relative z-10">
                 <a href="/" class="w-full py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-pink-500/20 flex items-center justify-center gap-2">
                     <i class="fa-solid fa-pen-nib"></i> Tạo thư khóa PIN của riêng bạn
                 </a>
@@ -217,6 +223,7 @@
         // Khởi tạo Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
+        const storage = firebase.storage(); // Khởi tạo Storage để lưu Media
 
         // Biến trạng thái
         let currentPinInput = "";
@@ -248,7 +255,7 @@
                 // CHẾ ĐỘ NGƯỜI VIẾT: Truy cập trang chủ để tạo thư
                 hideLoading();
                 document.getElementById("creatorScreen").classList.remove("hidden");
-                loadHistory();
+                loadHistory(); // Tải lịch sử và lắng nghe trạng thái Đã xem
             }
         }
 
@@ -263,6 +270,9 @@
             const recipient = document.getElementById("recipientInput").value.trim();
             const message = document.getElementById("messageInput").value.trim();
             const pin = document.getElementById("pinInput").value.trim();
+            const mediaFile = document.getElementById("mediaInput").files[0];
+            const btnSubmit = document.getElementById("btnSubmitForm");
+            const btnText = document.getElementById("btnSubmitText");
 
             if (!recipient || !message || !pin) {
                 alert("Vui lòng điền đầy đủ tên Người nhận, Nội dung thư và mã PIN!");
@@ -274,16 +284,41 @@
                 return;
             }
 
+            // Hiệu ứng Loading nút bấm
+            btnSubmit.disabled = true;
+            btnSubmit.classList.add("opacity-70", "cursor-wait");
+            btnText.innerText = "Đang mã hóa & Tải lên...";
+
             try {
+                let mediaUrl = null;
+                let mediaType = null;
+
+                // Nếu có đính kèm file, upload lên Storage trước
+                if (mediaFile) {
+                    const storageRef = storage.ref('media/' + Date.now() + '_' + mediaFile.name);
+                    const snapshot = await storageRef.put(mediaFile);
+                    mediaUrl = await snapshot.ref.getDownloadURL();
+                    mediaType = mediaFile.type;
+                }
+
                 // Lưu thư vào collection mang tên "messages"
-                const docRef = await db.collection("messages").add({
+                const docData = {
                     recipient: recipient,
                     content: message,
                     pin: pin,
+                    status: "unread", // Mặc định là chưa xem
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                };
 
-                // Tự động sinh ra URL liên kết thích hợp khi chạy trên Local lẫn Vercel
+                // Thêm mediaUrl nếu có
+                if (mediaUrl) {
+                    docData.mediaUrl = mediaUrl;
+                    docData.mediaType = mediaType;
+                }
+
+                const docRef = await db.collection("messages").add(docData);
+
+                // Tự động sinh ra URL liên kết
                 const shareLink = `${window.location.origin}${window.location.pathname}?id=${docRef.id}`;
                 
                 // Hiển thị kết quả link chia sẻ
@@ -291,12 +326,17 @@
                 document.getElementById("createForm").classList.add("hidden");
                 document.getElementById("successResult").classList.remove("hidden");
 
-                // Lưu thư đã tạo vào bộ nhớ trình duyệt để đề phòng quên copy link
-                saveToLocalHistory(recipient, shareLink);
+                // Bổ sung ID vào LocalHistory để có thể dò trạng thái "Đã xem"
+                saveToLocalHistory(docRef.id, recipient, shareLink);
 
             } catch (error) {
                 console.error("Lỗi tạo thư trên Firebase: ", error);
-                alert("Không thể lưu thư mật. Hãy chắc chắn bạn đã kích hoạt Firestore và chỉnh Rules sang True!");
+                alert("Không thể lưu thư mật. Nếu bạn có tải file đính kèm, hãy chắc chắn đã chuyển tab Rules của Storage thành True!");
+            } finally {
+                // Khôi phục nút bấm
+                btnSubmit.disabled = false;
+                btnSubmit.classList.remove("opacity-70", "cursor-wait");
+                btnText.innerText = "Tạo Liên Kết Khóa PIN";
             }
         }
 
@@ -304,6 +344,7 @@
             document.getElementById("recipientInput").value = "";
             document.getElementById("messageInput").value = "";
             document.getElementById("pinInput").value = "";
+            document.getElementById("mediaInput").value = ""; // Xóa file chọn cũ
             document.getElementById("successResult").classList.add("hidden");
             document.getElementById("createForm").classList.remove("hidden");
             loadHistory();
@@ -325,34 +366,60 @@
             }, 2000);
         }
 
-        // Quản lý lưu trữ lịch sử ở localStorage
-        function saveToLocalHistory(recipient, url) {
-            let history = JSON.parse(localStorage.getItem("letter_history")) || [];
-            history.unshift({ recipient, url, time: new Date().toLocaleDateString("vi-VN") });
+        // Quản lý lưu trữ lịch sử ở localStorage (Version 2 có lưu ID thư)
+        function saveToLocalHistory(id, recipient, url) {
+            let history = JSON.parse(localStorage.getItem("letter_history_v2")) || [];
+            history.unshift({ id, recipient, url, time: new Date().toLocaleDateString("vi-VN") });
             history = history.slice(0, 5); // Giới hạn lưu tối đa 5 thư gần nhất
-            localStorage.setItem("letter_history", JSON.stringify(history));
+            localStorage.setItem("letter_history_v2", JSON.stringify(history));
         }
 
         function loadHistory() {
             const container = document.getElementById("historyList");
-            const history = JSON.parse(localStorage.getItem("letter_history")) || [];
+            const history = JSON.parse(localStorage.getItem("letter_history_v2")) || [];
             
             if (history.length === 0) {
-                container.innerHTML = `<p class="text-[10px] text-slate-600 text-center py-2">Chưa có lịch sử tạo thư.</p>`;
+                container.innerHTML = `<p class="text-[10px] text-slate-600 text-center py-2">Chưa có thư nào được tạo.</p>`;
                 return;
             }
 
+            // Render khung HTML trước
             container.innerHTML = history.map(item => `
-                <div class="flex items-center justify-between p-2 rounded-lg bg-slate-950/40 border border-slate-900 text-[11px]">
+                <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/40 border border-slate-900 text-[11px] group">
                     <div class="truncate pr-2">
                         <span class="text-pink-400 font-medium">Đến: ${item.recipient}</span>
-                        <span class="block text-[9px] text-slate-600">${item.time}</span>
+                        <div class="flex items-center gap-1.5 mt-1">
+                            <span class="block text-[9px] text-slate-600">${item.time}</span>
+                            <span id="status-${item.id}" class="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải</span>
+                        </div>
                     </div>
-                    <a href="${item.url}" target="_blank" class="px-2 py-1 bg-slate-900 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition">
-                        <i class="fa-solid fa-link text-[9px]"></i> Xem lại
+                    <a href="${item.url}" target="_blank" class="px-2.5 py-1.5 bg-slate-900 group-hover:bg-pink-600 rounded text-slate-400 group-hover:text-white transition shadow shadow-transparent group-hover:shadow-pink-500/30">
+                        <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
                     </a>
                 </div>
             `).join('');
+
+            // Chạy vòng lặp gắn sự kiện Realtime Lắng nghe trạng thái từng bức thư
+            history.forEach(item => {
+                db.collection("messages").doc(item.id).onSnapshot(doc => {
+                    const statusBadge = document.getElementById(`status-${item.id}`);
+                    if (!statusBadge) return;
+                    
+                    if (doc.exists) {
+                        const data = doc.data();
+                        if (data.status === "read") {
+                            statusBadge.className = "text-[9px] px-1.5 py-0.5 rounded font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+                            statusBadge.innerHTML = '<i class="fa-solid fa-check-double mr-0.5"></i> Đã xem';
+                        } else {
+                            statusBadge.className = "text-[9px] px-1.5 py-0.5 rounded font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30";
+                            statusBadge.innerHTML = '<i class="fa-solid fa-envelope mr-0.5"></i> Đã gửi';
+                        }
+                    } else {
+                        statusBadge.className = "text-[9px] px-1.5 py-0.5 rounded font-medium bg-rose-500/20 text-rose-400 border border-rose-500/30";
+                        statusBadge.innerHTML = '<i class="fa-solid fa-trash mr-0.5"></i> Đã xóa';
+                    }
+                });
+            });
         }
 
 
@@ -399,13 +466,60 @@
             const dots = document.querySelectorAll('.pin-dot');
 
             if (currentPinInput === loadedLetterData.pin) {
-                // Nhập chính xác mã PIN ➔ Tiến hành mở phong thư
+                // 1. Nhập đúng PIN: Đánh dấu "Đã xem" trong Database
+                db.collection("messages").doc(secretLetterId).update({ 
+                    status: "read",
+                    readAt: firebase.firestore.FieldValue.serverTimestamp()
+                }).catch(e => console.log(e));
+
+                // 2. Ẩn màn hình khóa
                 document.getElementById("lockScreen").classList.add("hidden");
                 
+                // 3. Đổ dữ liệu văn bản vào thư
                 document.getElementById("letterFor").innerText = `Gửi ${loadedLetterData.recipient} ✨`;
                 document.getElementById("letterContent").innerText = loadedLetterData.content;
                 
-                document.getElementById("letterScreen").classList.remove("hidden");
+                // 4. Render Media (Hình ảnh / Âm thanh) nếu có đính kèm
+                const mediaContainer = document.getElementById("mediaContainer");
+                if (loadedLetterData.mediaUrl) {
+                    mediaContainer.classList.remove("hidden");
+                    if (loadedLetterData.mediaType.startsWith('image/')) {
+                        mediaContainer.innerHTML = `<img src="${loadedLetterData.mediaUrl}" class="rounded-xl max-h-64 object-cover border border-slate-700/50 shadow-lg" alt="Kỷ niệm">`;
+                    } else if (loadedLetterData.mediaType.startsWith('audio/')) {
+                        mediaContainer.innerHTML = `<audio controls src="${loadedLetterData.mediaUrl}" class="w-full h-10 rounded-lg outline-none"></audio>`;
+                    }
+                }
+                
+                // 5. Hiển thị trang Thư với hiệu ứng CSS Mở thư (envelope-open-anim)
+                const letterScreen = document.getElementById("letterScreen");
+                letterScreen.classList.remove("hidden");
+                letterScreen.classList.add("envelope-open-anim");
+
+                // 6. Bắn Pháo hoa ăn mừng bằng thư viện canvas-confetti
+                var duration = 3 * 1000;
+                var end = Date.now() + duration;
+
+                (function frame() {
+                    confetti({
+                        particleCount: 5,
+                        angle: 60,
+                        spread: 55,
+                        origin: { x: 0 },
+                        colors: ['#ec4899', '#a855f7', '#ffffff']
+                    });
+                    confetti({
+                        particleCount: 5,
+                        angle: 120,
+                        spread: 55,
+                        origin: { x: 1 },
+                        colors: ['#ec4899', '#a855f7', '#ffffff']
+                    });
+
+                    if (Date.now() < end) {
+                        requestAnimationFrame(frame);
+                    }
+                }());
+
             } else {
                 // Nhập sai mã PIN ➔ Báo lỗi và reset
                 errorMsg.innerText = "Mã PIN không chính xác. Hãy hỏi lại người gửi!";
