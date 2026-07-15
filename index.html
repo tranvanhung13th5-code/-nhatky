@@ -4,21 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hộp Thư Bí Mật Khóa PIN 💌</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,700;1,400&display=swap" rel="stylesheet">
-    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Firebase SDK (Compat v10 CDN) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <style>
+        :root {
+            /* Các biến CSS để thay đổi màu sắc chủ đề động */
+            --theme-color: #d946ef;
+            --theme-shadow: #f0abfc;
+            --bg-gradient-start: #2e1065;
+        }
         body {
             font-family: 'Inter', sans-serif;
-            background: radial-gradient(circle at top right, #2e1065, #0f172a, #020617);
+            background: radial-gradient(circle at top right, var(--bg-gradient-start), #0f172a, #020617);
+            transition: background 0.5s ease;
         }
         .font-serif-custom {
             font-family: 'Playfair Display', serif;
@@ -33,9 +36,9 @@
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .pin-dot.active {
-            background-color: #d946ef;
+            background-color: var(--theme-color);
             transform: scale(1.25);
-            box-shadow: 0 0 12px #f0abfc;
+            box-shadow: 0 0 12px var(--theme-shadow);
         }
         /* Custom scrollbar */
         ::-webkit-scrollbar {
@@ -55,7 +58,6 @@
 </head>
 <body class="text-slate-100 min-h-screen flex items-center justify-center p-4 selection:bg-pink-500 selection:text-white">
 
-    <!-- LOADING SCREEN -->
     <div id="loadingScreen" class="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-50 transition-opacity duration-300">
         <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-pink-500 mb-4"></div>
         <p class="text-slate-400 text-sm animate-pulse">Đang kết nối thư viện bảo mật...</p>
@@ -63,47 +65,67 @@
 
     <div class="w-full max-w-md my-8">
 
-        <!-- SCREEN 1: GIAO DIỆN SOẠN THƯ (Khi truy cập link gốc không có ID) -->
         <div id="creatorScreen" class="glass-panel rounded-3xl p-6 shadow-2xl hidden">
             <div class="text-center mb-6">
                 <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-pink-500/10 text-pink-400 text-2xl mb-3 border border-pink-500/20 shadow-inner">
                     <i class="fa-solid fa-envelope-open-text"></i>
                 </div>
                 <h1 class="text-xl font-bold tracking-tight text-slate-100">Gửi Lời Thì Thầm 💌</h1>
-                <p class="text-xs text-slate-400 mt-1">Viết điều muốn nhắn gửi & thiết lập mã PIN 6 số</p>
+                <p class="text-xs text-slate-400 mt-1">Viết điều muốn nhắn gửi & thiết lập bảo mật 2 lớp</p>
             </div>
 
-            <!-- Form tạo thư -->
             <div id="createForm" class="space-y-4">
+                
                 <div>
-                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Người nhận</label>
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">1. Chọn giao diện thư</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button" onclick="selectTheme('love')" id="btn-theme-love" class="theme-select-btn py-2 rounded-xl text-[11px] font-bold transition border-2 border-pink-500 bg-pink-500/20 text-pink-400">Tình yêu 💖</button>
+                        <button type="button" onclick="selectTheme('funny')" id="btn-theme-funny" class="theme-select-btn py-2 rounded-xl text-[11px] font-bold transition border-2 border-slate-700 bg-slate-800/80 text-amber-400 opacity-60 hover:opacity-100">Hài hước 😂</button>
+                        <button type="button" onclick="selectTheme('mystery')" id="btn-theme-mystery" class="theme-select-btn py-2 rounded-xl text-[11px] font-bold transition border-2 border-slate-700 bg-slate-800/80 text-emerald-400 opacity-60 hover:opacity-100">Bí ẩn 🕵️</button>
+                    </div>
+                    <input type="hidden" id="themeInput" value="love">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">2. Người nhận</label>
                     <input type="text" id="recipientInput" placeholder="Ví dụ: Bé Heo, Vy Vy, Người lạ..." 
                            class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 placeholder-slate-600 outline-none transition">
                 </div>
 
                 <div>
-                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Nội dung bức thư</label>
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">3. Nội dung bức thư</label>
                     <textarea id="messageInput" rows="5" placeholder="Ghi những điều bí mật bạn muốn nói với người ấy tại đây..." 
                               class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 placeholder-slate-600 outline-none transition resize-none"></textarea>
                 </div>
 
                 <div>
-                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Đặt mã bảo mật PIN (Đúng 6 số)</label>
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">4. Gợi ý cho lớp bảo mật 1</label>
+                    <input type="text" id="hintInput" placeholder="Ví dụ: Ngày quen nhau?, Sinh nhật?, Ngày kỉ niệm?..." 
+                           class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 placeholder-slate-600 outline-none transition">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">5. Đáp án lớp bảo mật 1</label>
+                    <input type="text" id="anniversaryInput" placeholder="Ví dụ: 01/09 (Có thể dùng chữ hoặc số)" 
+                           class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 placeholder-slate-600 outline-none transition">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">6. Lớp bảo mật 2: Mã PIN (Đúng 6 số)</label>
                     <input type="password" id="pinInput" placeholder="Ví dụ: 121204 (không chứa ký tự chữ)" maxlength="6" pattern="[0-9]*" inputmode="numeric"
                            class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 placeholder-slate-600 tracking-widest outline-none transition">
                 </div>
 
-                <button onclick="createNewLetter()" class="w-full py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-pink-500/20 flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-paper-plane"></i> Tạo Liên Kết Khóa PIN
+                <button onclick="createNewLetter()" class="w-full py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-pink-500/20 flex items-center justify-center gap-2 mt-4">
+                    <i class="fa-solid fa-paper-plane"></i> Tạo Liên Kết Khóa Kép
                 </button>
             </div>
 
-            <!-- Kết quả khi tạo thành công -->
             <div id="successResult" class="hidden space-y-4 py-4 animate-fade-in">
                 <div class="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
                     <i class="fa-solid fa-circle-check text-emerald-400 text-3xl mb-2"></i>
                     <h3 class="text-sm font-bold text-emerald-400">Đã Tạo Thư Thành Công!</h3>
-                    <p class="text-[10px] text-slate-400 mt-1">Nội dung thư của bạn đã được niêm phong an toàn.</p>
+                    <p class="text-[10px] text-slate-400 mt-1">Nội dung thư của bạn đã được niêm phong 2 lớp an toàn.</p>
                 </div>
 
                 <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
@@ -119,7 +141,6 @@
                 </button>
             </div>
 
-            <!-- Lịch sử thư đã tạo (Lưu nội bộ trên máy người gửi) -->
             <div id="historyBox" class="mt-6 pt-6 border-t border-slate-800/80">
                 <h4 class="text-[11px] font-bold text-slate-500 tracking-wider uppercase mb-3"><i class="fa-solid fa-clock-rotate-left mr-1"></i> Thư bạn đã tạo gần đây</h4>
                 <div id="historyList" class="space-y-2 max-h-[150px] overflow-y-auto pr-1">
@@ -129,18 +150,23 @@
         </div>
 
 
-        <!-- SCREEN 2: MÀN HÌNH KHÓA PIN 6 SỐ (Hiện khi người nhận mở link chia sẻ) -->
         <div id="lockScreen" class="glass-panel rounded-3xl p-8 shadow-2xl hidden">
-            <div class="text-center mb-8">
-                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-pink-500/10 text-pink-400 text-3xl mb-4 border border-pink-500/20 shadow-inner">
+            <div class="text-center mb-6">
+                <div id="lockIconBox" class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-pink-500/10 text-pink-400 text-3xl mb-4 border border-pink-500/20 shadow-inner transition-colors duration-300">
                     <i id="lockIcon" class="fa-solid fa-lock"></i>
                 </div>
                 <h1 id="lockTitle" class="text-xl font-bold tracking-tight text-slate-100">Thư Bí Mật Đang Khóa</h1>
-                <p id="lockSubtitle" class="text-xs text-slate-400 mt-1">Nhập mã PIN 6 số từ người gửi để mở thư</p>
+                <p id="lockSubtitle" class="text-xs text-slate-400 mt-1">Vui lòng vượt qua 2 lớp bảo mật để mở thư</p>
             </div>
 
-            <!-- Indicator hiển thị 6 chấm tròn mật khẩu -->
-            <div class="flex justify-center gap-3 mb-8">
+            <div id="anniversaryCheckContainer" class="mb-6 max-w-[280px] mx-auto">
+                <label id="readerHintLabel" class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 text-center">Bảo mật 1: Gợi ý</label>
+                <input type="text" id="readerAnniversaryInput" placeholder="Nhập đáp án của bạn..." 
+                       class="w-full bg-slate-900 border border-slate-700 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 rounded-xl px-4 py-3 text-center text-sm font-semibold text-slate-100 placeholder-slate-500 outline-none transition shadow-inner">
+            </div>
+
+            <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 text-center">Bảo mật 2: Mã PIN 6 Số</label>
+            <div class="flex justify-center gap-3 mb-6">
                 <span class="pin-dot w-4 h-4 rounded-full border border-slate-600 bg-slate-800"></span>
                 <span class="pin-dot w-4 h-4 rounded-full border border-slate-600 bg-slate-800"></span>
                 <span class="pin-dot w-4 h-4 rounded-full border border-slate-600 bg-slate-800"></span>
@@ -149,7 +175,6 @@
                 <span class="pin-dot w-4 h-4 rounded-full border border-slate-600 bg-slate-800"></span>
             </div>
 
-            <!-- Bàn phím số ảo -->
             <div class="grid grid-cols-3 gap-4 max-w-[280px] mx-auto mb-4">
                 <button onclick="pressKey('1')" class="h-14 w-14 rounded-full bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/30 text-lg font-semibold transition active:scale-95 focus:outline-none">1</button>
                 <button onclick="pressKey('2')" class="h-14 w-14 rounded-full bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/30 text-lg font-semibold transition active:scale-95 focus:outline-none">2</button>
@@ -171,29 +196,26 @@
         </div>
 
 
-        <!-- SCREEN 3: MÀN HÌNH ĐỌC THƯ (Chỉ mở ra khi nhập đúng PIN 6 số) -->
         <div id="letterScreen" class="glass-panel rounded-3xl p-8 shadow-2xl hidden relative overflow-hidden animate-fade-in">
-            <!-- Trực quan hóa hình trái tim chìm cực đẹp -->
-            <div class="absolute -top-6 -right-6 text-pink-500/10 text-8xl pointer-events-none select-none">
+            <div id="bgDeco" class="absolute -top-6 -right-6 text-pink-500/10 text-8xl pointer-events-none select-none transition-colors duration-500">
                 <i class="fa-solid fa-heart"></i>
             </div>
             
-            <div class="border-b border-pink-500/20 pb-4 mb-6">
-                <div class="flex items-center gap-2 text-pink-400 text-xs font-bold tracking-widest uppercase">
-                    <i class="fa-solid fa-envelope animate-pulse"></i> Thư mật dành riêng cho bạn
+            <div class="border-b border-slate-700/50 pb-4 mb-6 relative z-10">
+                <div id="letterHeader" class="flex items-center gap-2 text-pink-400 text-xs font-bold tracking-widest uppercase transition-colors duration-300">
+                    <i id="letterHeaderIcon" class="fa-solid fa-envelope animate-pulse"></i> Thư mật dành riêng cho bạn
                 </div>
                 <h2 id="letterFor" class="text-2xl font-bold font-serif-custom text-slate-100 mt-2">Gửi Bé Yêu ✨</h2>
             </div>
 
-            <!-- Nội dung bức thư -->
-            <div class="bg-slate-950/40 p-5 rounded-2xl border border-slate-800/50 mb-6">
+            <div class="bg-slate-950/50 p-5 rounded-2xl border border-slate-800/50 mb-6 relative z-10 shadow-inner">
                 <p id="letterContent" class="text-sm text-slate-300 leading-relaxed font-serif-custom italic whitespace-pre-line">
                     ...
                 </p>
             </div>
 
-            <div class="space-y-3">
-                <a href="/" class="w-full py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-pink-500/20 flex items-center justify-center gap-2">
+            <div class="space-y-3 relative z-10">
+                <a href="/" class="w-full py-3 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-lg flex items-center justify-center gap-2 border border-slate-700">
                     <i class="fa-solid fa-pen-nib"></i> Tạo thư khóa PIN của riêng bạn
                 </a>
                 <p class="text-[9px] text-center text-slate-500 tracking-wider">THƯ SẼ TỰ ĐỘNG KHÓA LẠI KHI BẠN TẮT TRANG WEB NÀY</p>
@@ -229,11 +251,24 @@
             secretLetterId = urlParams.get('id');
 
             if (secretLetterId) {
-                // CHẾ ĐỘ NGƯỜI NHẬN: Link có ID, yêu cầu nhập PIN để mở thư
+                // CHẾ ĐỘ NGƯỜI NHẬN: Link có ID, yêu cầu nhập bảo mật 2 lớp
                 try {
                     const doc = await db.collection("messages").doc(secretLetterId).get();
                     if (doc.exists) {
                         loadedLetterData = doc.data();
+                        
+                        // Áp dụng Theme giao diện từ Database
+                        const theme = loadedLetterData.theme || 'love';
+                        applyThemeToViewer(theme);
+
+                        // Hỗ trợ thư cũ và hiển thị gợi ý bảo mật 1
+                        if (!loadedLetterData.anniversary) {
+                            document.getElementById("anniversaryCheckContainer").classList.add("hidden");
+                        } else {
+                            // Nếu người gửi có thiết lập Gợi ý (hint), hiển thị nó ra. Nếu thư cũ không có hint, dùng mặc định
+                            document.getElementById("readerHintLabel").innerText = loadedLetterData.hint ? `Bảo mật 1: ${loadedLetterData.hint}` : "Bảo mật 1: Kỷ niệm / Ngày quen nhau";
+                        }
+
                         hideLoading();
                         document.getElementById("lockScreen").classList.remove("hidden");
                     } else {
@@ -258,14 +293,90 @@
             setTimeout(() => loading.classList.add('hidden'), 300);
         }
 
+        // Chọn theme ở màn hình người viết
+        function selectTheme(theme) {
+            document.getElementById('themeInput').value = theme;
+            
+            const btns = {
+                'love': document.getElementById('btn-theme-love'),
+                'funny': document.getElementById('btn-theme-funny'),
+                'mystery': document.getElementById('btn-theme-mystery')
+            };
+
+            // Reset tất cả nút về trạng thái mờ
+            btns['love'].className = "theme-select-btn py-2 rounded-xl text-[11px] font-bold transition border-2 border-slate-700 bg-slate-800/80 text-pink-400 opacity-60 hover:opacity-100";
+            btns['funny'].className = "theme-select-btn py-2 rounded-xl text-[11px] font-bold transition border-2 border-slate-700 bg-slate-800/80 text-amber-400 opacity-60 hover:opacity-100";
+            btns['mystery'].className = "theme-select-btn py-2 rounded-xl text-[11px] font-bold transition border-2 border-slate-700 bg-slate-800/80 text-emerald-400 opacity-60 hover:opacity-100";
+
+            // Highlight nút được chọn
+            if (theme === 'love') {
+                btns['love'].className = "theme-select-btn py-2 rounded-xl text-[11px] font-bold transition border-2 border-pink-500 bg-pink-500/20 text-pink-400";
+            } else if (theme === 'funny') {
+                btns['funny'].className = "theme-select-btn py-2 rounded-xl text-[11px] font-bold transition border-2 border-amber-500 bg-amber-500/20 text-amber-400";
+            } else if (theme === 'mystery') {
+                btns['mystery'].className = "theme-select-btn py-2 rounded-xl text-[11px] font-bold transition border-2 border-emerald-500 bg-emerald-500/20 text-emerald-400";
+            }
+        }
+
+        // Áp dụng Theme hiển thị ra trình duyệt
+        function applyThemeToViewer(theme) {
+            const root = document.documentElement;
+            const bgDeco = document.getElementById('bgDeco');
+            const lockIconBox = document.getElementById('lockIconBox');
+            const lockIcon = document.getElementById('lockIcon');
+            const letterHeader = document.getElementById('letterHeader');
+            const letterHeaderIcon = document.getElementById('letterHeaderIcon');
+
+            if (theme === 'love') {
+                root.style.setProperty('--theme-color', '#d946ef'); // fuchsia/pink
+                root.style.setProperty('--theme-shadow', '#f0abfc');
+                root.style.setProperty('--bg-gradient-start', '#2e1065'); // deep purple
+                
+                lockIconBox.className = 'inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-pink-500/10 text-pink-400 text-3xl mb-4 border border-pink-500/20 shadow-inner';
+                lockIcon.className = 'fa-solid fa-lock';
+                bgDeco.className = 'absolute -top-6 -right-6 text-pink-500/10 text-8xl pointer-events-none select-none';
+                bgDeco.innerHTML = '<i class="fa-solid fa-heart"></i>';
+                letterHeader.className = 'flex items-center gap-2 text-pink-400 text-xs font-bold tracking-widest uppercase';
+                letterHeaderIcon.className = 'fa-solid fa-envelope animate-pulse';
+
+            } else if (theme === 'funny') {
+                root.style.setProperty('--theme-color', '#f59e0b'); // amber
+                root.style.setProperty('--theme-shadow', '#fcd34d');
+                root.style.setProperty('--bg-gradient-start', '#78350f'); // deep brown/orange
+                
+                lockIconBox.className = 'inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-400 text-3xl mb-4 border border-amber-500/20 shadow-inner';
+                lockIcon.className = 'fa-solid fa-face-grin-stars';
+                bgDeco.className = 'absolute -top-6 -right-6 text-amber-500/10 text-8xl pointer-events-none select-none';
+                bgDeco.innerHTML = '<i class="fa-solid fa-face-laugh-squint"></i>';
+                letterHeader.className = 'flex items-center gap-2 text-amber-400 text-xs font-bold tracking-widest uppercase';
+                letterHeaderIcon.className = 'fa-solid fa-face-grin-tears animate-bounce';
+
+            } else if (theme === 'mystery') {
+                root.style.setProperty('--theme-color', '#10b981'); // emerald
+                root.style.setProperty('--theme-shadow', '#6ee7b7');
+                root.style.setProperty('--bg-gradient-start', '#064e3b'); // deep green
+                
+                lockIconBox.className = 'inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-500/10 text-emerald-400 text-3xl mb-4 border border-emerald-500/20 shadow-inner';
+                lockIcon.className = 'fa-solid fa-user-secret';
+                bgDeco.className = 'absolute -top-6 -right-6 text-emerald-500/10 text-8xl pointer-events-none select-none';
+                bgDeco.innerHTML = '<i class="fa-solid fa-mask"></i>';
+                letterHeader.className = 'flex items-center gap-2 text-emerald-400 text-xs font-bold tracking-widest uppercase';
+                letterHeaderIcon.className = 'fa-solid fa-hat-wizard animate-pulse';
+            }
+        }
+
+
         // 3. XỬ LÝ CHẾ ĐỘ NGƯỜI VIẾT (TẠO THƯ)
         async function createNewLetter() {
             const recipient = document.getElementById("recipientInput").value.trim();
             const message = document.getElementById("messageInput").value.trim();
             const pin = document.getElementById("pinInput").value.trim();
+            const hint = document.getElementById("hintInput").value.trim();
+            const anniversary = document.getElementById("anniversaryInput").value.trim();
+            const theme = document.getElementById("themeInput").value;
 
-            if (!recipient || !message || !pin) {
-                alert("Vui lòng điền đầy đủ tên Người nhận, Nội dung thư và mã PIN!");
+            if (!recipient || !message || !pin || !anniversary || !hint) {
+                alert("Vui lòng điền đầy đủ: Người nhận, Nội dung thư, Gợi ý, Đáp án và Mã PIN!");
                 return;
             }
 
@@ -280,10 +391,13 @@
                     recipient: recipient,
                     content: message,
                     pin: pin,
+                    anniversary: anniversary,
+                    hint: hint,
+                    theme: theme,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
-                // Tự động sinh ra URL liên kết thích hợp khi chạy trên Local lẫn Vercel
+                // Tự động sinh ra URL liên kết thích hợp 
                 const shareLink = `${window.location.origin}${window.location.pathname}?id=${docRef.id}`;
                 
                 // Hiển thị kết quả link chia sẻ
@@ -304,6 +418,8 @@
             document.getElementById("recipientInput").value = "";
             document.getElementById("messageInput").value = "";
             document.getElementById("pinInput").value = "";
+            document.getElementById("hintInput").value = "";
+            document.getElementById("anniversaryInput").value = "";
             document.getElementById("successResult").classList.add("hidden");
             document.getElementById("createForm").classList.remove("hidden");
             loadHistory();
@@ -393,13 +509,22 @@
             });
         }
 
-        // Xác thực mã PIN của người nhận nhập vào
+        // Xác thực mã PIN và Lớp bảo mật 1
         function validatePin() {
             const errorMsg = document.getElementById("errorMsg");
             const dots = document.querySelectorAll('.pin-dot');
+            const readerAnniversary = document.getElementById("readerAnniversaryInput").value.trim();
+            const expectedAnniversary = loadedLetterData.anniversary || "";
 
-            if (currentPinInput === loadedLetterData.pin) {
-                // Nhập chính xác mã PIN ➔ Tiến hành mở phong thư
+            // Kiểm tra khớp thông tin Lớp bảo mật 1 (nếu có thiết lập)
+            let isAnniversaryCorrect = true;
+            if (expectedAnniversary !== "") {
+                // Chuyển về chữ thường để so sánh không phân biệt hoa/thường
+                isAnniversaryCorrect = (readerAnniversary.toLowerCase() === expectedAnniversary.toLowerCase());
+            }
+
+            if (currentPinInput === loadedLetterData.pin && isAnniversaryCorrect) {
+                // BẢO MẬT KÉP CHÍNH XÁC ➔ Tiến hành mở phong thư
                 document.getElementById("lockScreen").classList.add("hidden");
                 
                 document.getElementById("letterFor").innerText = `Gửi ${loadedLetterData.recipient} ✨`;
@@ -407,14 +532,30 @@
                 
                 document.getElementById("letterScreen").classList.remove("hidden");
             } else {
-                // Nhập sai mã PIN ➔ Báo lỗi và reset
-                errorMsg.innerText = "Mã PIN không chính xác. Hãy hỏi lại người gửi!";
+                // SAI THÔNG TIN ➔ Báo lỗi và reset
+                if (!isAnniversaryCorrect) {
+                    errorMsg.innerText = "Lỗi: Đáp án cho Lớp bảo mật 1 chưa chính xác!";
+                    const aniInput = document.getElementById("readerAnniversaryInput");
+                    aniInput.classList.add("border-rose-500", "ring-1", "ring-rose-500");
+                    setTimeout(() => aniInput.classList.remove("border-rose-500", "ring-1", "ring-rose-500"), 1500);
+                } else {
+                    errorMsg.innerText = "Lỗi: Mã PIN 6 số không chính xác!";
+                }
                 
-                dots.forEach(dot => dot.classList.add('bg-rose-500', 'border-rose-500'));
+                // Báo đỏ các chấm PIN
+                dots.forEach(dot => {
+                    dot.style.backgroundColor = '#f43f5e'; // rose-500
+                    dot.style.borderColor = '#f43f5e';
+                    dot.style.boxShadow = 'none';
+                });
+
                 setTimeout(() => {
-                    dots.forEach(dot => dot.classList.remove('bg-rose-500', 'border-rose-500'));
+                    dots.forEach(dot => {
+                        dot.style.backgroundColor = '';
+                        dot.style.borderColor = '';
+                    });
                     clearPin();
-                }, 600);
+                }, 700);
             }
         }
 
