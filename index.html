@@ -13,7 +13,6 @@
 
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 
     <style>
         :root {
@@ -112,10 +111,13 @@
 
                 <div>
                     <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">5. Đính kèm ảnh (Tùy chọn)</label>
-                    <input type="file" id="imageUploadInput" accept="image/*" onchange="handleImageUpload(event)"
-                           class="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-pink-500/10 file:text-pink-400 hover:file:bg-pink-500/20 transition cursor-pointer">
+                    <button type="button" 
+                            onclick="window.open('https://taianhnhatky.vercel.app', 'width=450,height=620,scrollbars=no,resizable=no');" 
+                            class="w-full py-2.5 border border-pink-500/50 bg-pink-500/10 text-pink-400 rounded-xl text-xs font-bold hover:bg-pink-500/20 transition shadow-inner">
+                        <i class="fa-solid fa-cloud-arrow-up mr-2"></i> Mở trình Tải Ảnh Cloud
+                    </button>
                     <input type="hidden" id="imageUrlInput" value="">
-                    <p id="uploadStatus" class="text-[10px] text-emerald-400 mt-1 hidden"><i class="fa-solid fa-check"></i> Ảnh đã được tải lên sẵn sàng!</p>
+                    <p id="uploadStatus" class="text-[11px] text-emerald-400 mt-2 hidden text-center italic font-semibold"></p>
                 </div>
 
                 <div>
@@ -254,12 +256,11 @@
     </div>
 
     <script>
-        // Cấu hình Firebase (Đã thêm tham số storageBucket quan trọng)
+        // Cấu hình Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyBtebZ6KlzYO-xoHAh6qfz6duS3cTlyF04",
             authDomain: "nhatky-9acf5.firebaseapp.com",
             projectId: "nhatky-9acf5",
-            storageBucket: "nhatky-9acf5.firebasestorage.app",
             messagingSenderId: "508563399846",
             appId: "1:508563399846:web:d5fb08bf1f383ebd340067",
             measurementId: "G-MX3C9T3YTK"
@@ -381,49 +382,6 @@
             }
         }
 
-        // TẢI ẢNH TRỰC TIẾP LÊN FIREBASE STORAGE CÓ PROGRESS BAR
-        function handleImageUpload(event) {
-            const file = event.target.files[0];
-            if(!file) return;
-
-            const statusEl = document.getElementById('uploadStatus');
-            statusEl.classList.remove('hidden');
-            statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải ảnh: 0%';
-            
-            // Xóa link ảnh cũ nếu có
-            document.getElementById('imageUrlInput').value = "";
-
-            try {
-                // Tối ưu tên file tránh lỗi ký tự đặc biệt
-                const safeFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
-                const storageRef = firebase.storage().ref();
-                const fileRef = storageRef.child('images/' + Date.now() + "_" + safeFileName);
-                
-                const uploadTask = fileRef.put(file);
-
-                uploadTask.on('state_changed', 
-                    (snapshot) => {
-                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                        statusEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang tải ảnh: ${Math.round(progress)}%`;
-                    }, 
-                    (error) => {
-                        console.error("Lỗi Firebase Storage:", error);
-                        statusEl.innerHTML = '<i class="fa-solid fa-xmark text-rose-400"></i> Lỗi tải ảnh! Hãy kiểm tra lại kết nối mạng.';
-                    }, 
-                    () => {
-                        // Upload thành công, lấy link
-                        uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
-                            document.getElementById('imageUrlInput').value = downloadURL;
-                            statusEl.innerHTML = '<i class="fa-solid fa-check text-emerald-400"></i> Ảnh đã được tải lên sẵn sàng!';
-                        });
-                    }
-                );
-            } catch (err) {
-                console.error("Lỗi upload:", err);
-                statusEl.innerHTML = '<i class="fa-solid fa-xmark text-rose-400"></i> Lỗi hệ thống, vui lòng thử lại.';
-            }
-        }
-
         // TẠO HOẶC CẬP NHẬT THƯ
         async function submitLetter() {
             const btnSubmit = document.getElementById("btnSubmitLetter");
@@ -436,7 +394,7 @@
                 font: document.getElementById("fontInput").value,
                 recipient: document.getElementById("recipientInput").value.trim(),
                 content: document.getElementById("messageInput").value.trim(),
-                imageUrl: document.getElementById("imageUrlInput").value, // Lấy link ảnh từ ô input ẩn
+                imageUrl: document.getElementById("imageUrlInput").value, // Lấy link ảnh tự động được dán từ Popup
                 hint: document.getElementById("hintInput").value.trim(),
                 anniversary: document.getElementById("anniversaryInput").value.trim(),
                 pin: document.getElementById("pinInput").value.trim(),
@@ -514,9 +472,13 @@
             
             document.getElementById("recipientInput").value = "";
             document.getElementById("messageInput").value = "";
-            document.getElementById("imageUrlInput").value = "";
-            document.getElementById("imageUploadInput").value = ""; // Reset nút chọn file
-            document.getElementById("uploadStatus").classList.add("hidden");
+            
+            // Xóa dữ liệu Link ảnh cũ
+            document.getElementById("imageUrlInput").value = ""; 
+            const statusEl = document.getElementById("uploadStatus");
+            statusEl.classList.add("hidden");
+            statusEl.innerHTML = "";
+            
             document.getElementById("pinInput").value = "";
             document.getElementById("hintInput").value = "";
             document.getElementById("anniversaryInput").value = "";
@@ -562,6 +524,12 @@
             `).join('');
         }
 
+        function hasPermission(docData, id) {
+            if (docData.creatorToken === myCreatorToken) return true;
+            const history = JSON.parse(localStorage.getItem("letter_history")) || [];
+            return history.some(item => item.id === id);
+        }
+
         async function editLetter(id) {
             try {
                 const doc = await db.collection("messages").doc(id).get();
@@ -574,13 +542,17 @@
                         document.getElementById("fontInput").value = data.font || 'font-serif-custom';
                         document.getElementById("recipientInput").value = data.recipient;
                         document.getElementById("messageInput").value = data.content;
+                        
                         document.getElementById("imageUrlInput").value = data.imageUrl || "";
+                        const statusEl = document.getElementById("uploadStatus");
                         if (data.imageUrl) {
-                            document.getElementById("uploadStatus").classList.remove("hidden");
-                            document.getElementById("uploadStatus").innerHTML = '<i class="fa-solid fa-check"></i> Thư đã có sẵn ảnh cũ!';
+                            statusEl.classList.remove("hidden");
+                            statusEl.innerHTML = '<i class="fa-solid fa-check text-emerald-400 mr-1"></i> Thư đã có sẵn ảnh đính kèm!';
                         } else {
-                            document.getElementById("uploadStatus").classList.add("hidden");
+                            statusEl.classList.add("hidden");
+                            statusEl.innerHTML = "";
                         }
+                        
                         document.getElementById("hintInput").value = data.hint;
                         document.getElementById("anniversaryInput").value = data.anniversary;
                         document.getElementById("pinInput").value = data.pin;
