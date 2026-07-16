@@ -174,7 +174,6 @@
             </div>
         </div>
 
-
         <div id="lockScreen" class="glass-panel rounded-3xl p-8 shadow-2xl hidden relative">
             <div id="lockoutOverlay" class="absolute inset-0 bg-slate-950/90 rounded-3xl z-20 flex flex-col items-center justify-center hidden backdrop-blur-sm">
                 <i class="fa-solid fa-user-lock text-4xl text-rose-500 mb-3 animate-bounce"></i>
@@ -255,7 +254,7 @@
     </div>
 
     <script>
-        // 1. Cấu hình Firebase
+        // Cấu hình Firebase (Đã thêm tham số storageBucket quan trọng)
         const firebaseConfig = {
             apiKey: "AIzaSyBtebZ6KlzYO-xoHAh6qfz6duS3cTlyF04",
             authDomain: "nhatky-9acf5.firebaseapp.com",
@@ -265,6 +264,7 @@
             appId: "1:508563399846:web:d5fb08bf1f383ebd340067",
             measurementId: "G-MX3C9T3YTK"
         };
+        
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
@@ -381,46 +381,66 @@
             }
         }
 
-        // TẢI ẢNH TRỰC TIẾP LÊN FIREBASE STORAGE (XỬ LÝ TRIỆT ĐỂ LỖI 500 VÀ LỖI CORS)
-        async function handleImageUpload(event) {
+        // TẢI ẢNH TRỰC TIẾP LÊN FIREBASE STORAGE CÓ PROGRESS BAR
+        function handleImageUpload(event) {
             const file = event.target.files[0];
             if(!file) return;
 
             const statusEl = document.getElementById('uploadStatus');
             statusEl.classList.remove('hidden');
-            statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải ảnh trực tiếp lên Firebase...';
+            statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải ảnh: 0%';
+            
+            // Xóa link ảnh cũ nếu có
+            document.getElementById('imageUrlInput').value = "";
 
             try {
-                // Khởi tạo tham chiếu đến Firebase Storage
+                // Tối ưu tên file tránh lỗi ký tự đặc biệt
+                const safeFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
                 const storageRef = firebase.storage().ref();
-                const fileRef = storageRef.child('images/' + Date.now() + "_" + file.name);
+                const fileRef = storageRef.child('images/' + Date.now() + "_" + safeFileName);
                 
-                // Thực hiện upload file
-                const snapshot = await fileRef.put(file);
-                // Lấy URL công khai sau khi upload hoàn tất
-                const downloadURL = await snapshot.ref.getDownloadURL();
-                
-                document.getElementById('imageUrlInput').value = downloadURL;
-                statusEl.innerHTML = '<i class="fa-solid fa-check text-emerald-400"></i> Ảnh đã được tải lên sẵn sàng!';
+                const uploadTask = fileRef.put(file);
+
+                uploadTask.on('state_changed', 
+                    (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        statusEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang tải ảnh: ${Math.round(progress)}%`;
+                    }, 
+                    (error) => {
+                        console.error("Lỗi Firebase Storage:", error);
+                        statusEl.innerHTML = '<i class="fa-solid fa-xmark text-rose-400"></i> Lỗi tải ảnh! Hãy kiểm tra lại kết nối mạng.';
+                    }, 
+                    () => {
+                        // Upload thành công, lấy link
+                        uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
+                            document.getElementById('imageUrlInput').value = downloadURL;
+                            statusEl.innerHTML = '<i class="fa-solid fa-check text-emerald-400"></i> Ảnh đã được tải lên sẵn sàng!';
+                        });
+                    }
+                );
             } catch (err) {
-                console.error("Lỗi Firebase Storage:", err);
-                statusEl.innerHTML = '<i class="fa-solid fa-xmark text-rose-400"></i> Lỗi upload! Vui lòng kiểm tra tab Rules của Firebase Storage.';
+                console.error("Lỗi upload:", err);
+                statusEl.innerHTML = '<i class="fa-solid fa-xmark text-rose-400"></i> Lỗi hệ thống, vui lòng thử lại.';
             }
         }
 
         // TẠO HOẶC CẬP NHẬT THƯ
         async function submitLetter() {
+            const btnSubmit = document.getElementById("btnSubmitLetter");
+            const btnText = document.getElementById("btnSubmitText");
+            const originalText = btnText.innerText;
+            
             const editId = document.getElementById("editLetterId").value;
             const payload = {
                 theme: document.getElementById("themeInput").value,
                 font: document.getElementById("fontInput").value,
                 recipient: document.getElementById("recipientInput").value.trim(),
                 content: document.getElementById("messageInput").value.trim(),
-                imageUrl: document.getElementById("imageUrlInput").value,
+                imageUrl: document.getElementById("imageUrlInput").value, // Lấy link ảnh từ ô input ẩn
                 hint: document.getElementById("hintInput").value.trim(),
                 anniversary: document.getElementById("anniversaryInput").value.trim(),
                 pin: document.getElementById("pinInput").value.trim(),
-                creatorToken: myCreatorToken // Để xác thực quyền sở hữu khi xóa/sửa
+                creatorToken: myCreatorToken
             };
 
             if (!payload.recipient || !payload.content || !payload.pin || !payload.anniversary || !payload.hint) {
@@ -430,14 +450,17 @@
                 alert("Mã PIN phải đúng 6 số!"); return;
             }
 
+            // Hiệu ứng Loading cho nút lưu
+            btnSubmit.disabled = true;
+            btnText.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu thư...';
+
             try {
                 let docId = editId;
                 if (editId) {
-                    // Update thư cũ
                     await db.collection("messages").doc(editId).update(payload);
                 } else {
-                    // Tạo thư mới
-                    payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    // Dùng timestamp client cho an toàn, tránh lỗi serverTimestamp
+                    payload.createdAt = new Date().toISOString();
                     const docRef = await db.collection("messages").add(payload);
                     docId = docRef.id;
                 }
@@ -448,11 +471,14 @@
                 document.getElementById("createForm").classList.add("hidden");
                 document.getElementById("successResult").classList.remove("hidden");
                 
-                // Đồng bộ lịch sử (sẽ ghi đè/cập nhật lại tên người nhận nếu là chế độ Sửa)
                 saveToLocalHistory(docId, payload.recipient, shareLink);
 
             } catch (error) {
-                alert("Lỗi hệ thống. Không thể lưu thư!");
+                console.error("Lỗi lưu thư:", error);
+                alert("Lỗi hệ thống. Không thể lưu thư! Kiểm tra lại Firebase Rule.");
+            } finally {
+                btnSubmit.disabled = false;
+                btnText.innerText = originalText;
             }
         }
 
@@ -489,6 +515,7 @@
             document.getElementById("recipientInput").value = "";
             document.getElementById("messageInput").value = "";
             document.getElementById("imageUrlInput").value = "";
+            document.getElementById("imageUploadInput").value = ""; // Reset nút chọn file
             document.getElementById("uploadStatus").classList.add("hidden");
             document.getElementById("pinInput").value = "";
             document.getElementById("hintInput").value = "";
@@ -499,23 +526,12 @@
             loadHistory();
         }
 
-        // Hàm kiểm tra quyền chỉnh sửa / xóa thư
-        function hasPermission(docData, id) {
-            // Trường hợp 1: Có creatorToken và khớp mã token lưu trong trình duyệt
-            if (docData.creatorToken === myCreatorToken) return true;
-            
-            // Trường hợp 2: Thư cũ không có trường creatorToken trong DB, nhưng ID thư vẫn nằm trong lịch sử duyệt web
-            const history = JSON.parse(localStorage.getItem("letter_history")) || [];
-            return history.some(item => item.id === id);
-        }
-
         // LỊCH SỬ & SỬA & XÓA THƯ
         function saveToLocalHistory(id, recipient, url) {
             let history = JSON.parse(localStorage.getItem("letter_history")) || [];
             const existingIdx = history.findIndex(item => item.id === id);
             
             if (existingIdx !== -1) {
-                // Cập nhật lại tên người nhận trong lịch sử nếu thư vừa được chỉnh sửa
                 history[existingIdx].recipient = recipient;
             } else {
                 history.unshift({ id, recipient, url, time: new Date().toLocaleDateString("vi-VN") });
@@ -562,6 +578,8 @@
                         if (data.imageUrl) {
                             document.getElementById("uploadStatus").classList.remove("hidden");
                             document.getElementById("uploadStatus").innerHTML = '<i class="fa-solid fa-check"></i> Thư đã có sẵn ảnh cũ!';
+                        } else {
+                            document.getElementById("uploadStatus").classList.add("hidden");
                         }
                         document.getElementById("hintInput").value = data.hint;
                         document.getElementById("anniversaryInput").value = data.anniversary;
@@ -638,7 +656,6 @@
         function pressKey(num) {
             if (currentPinInput.length < 6) {
                 currentPinInput += num; updatePinDots();
-                // Gọi trực tiếp validatePin để đồng bộ hóa luồng click (bảo toàn User Gesture giúp bật nhạc)
                 if (currentPinInput.length === 6) validatePin();
             }
         }
@@ -656,10 +673,8 @@
             const isAnniversaryCorrect = readerAnniversary === expectedAnniversary;
 
             if (currentPinInput === loadedLetterData.pin && isAnniversaryCorrect) {
-                // Xóa log nhập sai
                 localStorage.removeItem(`attempts_${secretLetterId}`);
                 
-                // Mở thư
                 document.getElementById("lockScreen").classList.add("hidden");
                 document.getElementById("letterFor").innerText = `Gửi ${loadedLetterData.recipient} ✨`;
                 
@@ -672,20 +687,18 @@
                     img.src = loadedLetterData.imageUrl;
                     img.classList.remove("hidden");
                 } else {
-                    // Ẩn ảnh nếu bức thư hiện tại không đính kèm ảnh
                     img.classList.add("hidden");
                     img.src = "";
                 }
                 
                 document.getElementById("letterScreen").classList.remove("hidden");
-                triggerEffects(loadedLetterData.theme || 'love'); // Bắn hiệu ứng và phát nhạc
+                triggerEffects(loadedLetterData.theme || 'love');
             } else {
-                // Xử lý đếm số lần sai
                 let attempts = parseInt(localStorage.getItem(`attempts_${secretLetterId}`) || 0) + 1;
                 localStorage.setItem(`attempts_${secretLetterId}`, attempts);
                 
                 if(attempts >= 5) {
-                    const lockTime = Date.now() + 5 * 60 * 1000; // 5 phút
+                    const lockTime = Date.now() + 5 * 60 * 1000;
                     localStorage.setItem(`lock_${secretLetterId}`, lockTime);
                     enableLockoutUI(lockTime);
                     errorMsg.innerText = "";
@@ -698,7 +711,6 @@
             }
         }
 
-        // Tắt tất cả nhạc cũ để tránh các bài hát đè lên nhau
         function stopAllMusic() {
             ['love', 'funny', 'mystery'].forEach(theme => {
                 const audio = document.getElementById(`audio-${theme}`);
@@ -709,20 +721,16 @@
             });
         }
 
-        // TẠO HIỆU ỨNG & PHÁT NHẠC
         function triggerEffects(theme) {
             try {
-                // Tắt nhạc cũ trước khi chuyển nhạc mới
                 stopAllMusic();
 
-                // Phát nhạc tương ứng
                 const audio = document.getElementById(`audio-${theme}`);
                 if(audio) {
                     audio.volume = 0.5;
                     audio.play().catch(e => console.log("Lỗi phát nhạc:", e));
                 }
                 
-                // Hiệu ứng pháo hoa Confetti
                 if (theme === 'love') {
                     const duration = 3000; const end = Date.now() + duration;
                     (function frame() {
