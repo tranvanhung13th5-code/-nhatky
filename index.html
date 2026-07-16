@@ -5,15 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hộp Thư Bí Mật Khóa PIN 💌</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,700;1,400&display=swap" rel="stylesheet">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,700;1,400&family=Dancing+Script:wght@500;700&family=Montserrat:wght@400;600&family=VT323&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <style>
         :root {
-            /* Các biến CSS để thay đổi màu sắc chủ đề động */
             --theme-color: #d946ef;
             --theme-shadow: #f0abfc;
             --bg-gradient-start: #2e1065;
@@ -23,40 +25,38 @@
             background: radial-gradient(circle at top right, var(--bg-gradient-start), #0f172a, #020617);
             transition: background 0.5s ease;
         }
-        .font-serif-custom {
-            font-family: 'Playfair Display', serif;
-        }
+        /* Các class font chữ */
+        .font-serif-custom { font-family: 'Playfair Display', serif; }
+        .font-handwriting { font-family: 'Dancing Script', cursive; font-size: 1.15rem; }
+        .font-modern { font-family: 'Montserrat', sans-serif; }
+        .font-pixel { font-family: 'VT323', monospace; font-size: 1.25rem; }
+
         .glass-panel {
             background: rgba(15, 23, 42, 0.65);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
-        .pin-dot {
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        }
+        .pin-dot { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
         .pin-dot.active {
             background-color: var(--theme-color);
             transform: scale(1.25);
             box-shadow: 0 0 12px var(--theme-shadow);
         }
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 5px;
-        }
-        ::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.02);
-        }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(217, 70, 239, 0.3);
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(217, 70, 239, 0.6);
-        }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); }
+        ::-webkit-scrollbar-thumb { background: rgba(217, 70, 239, 0.3); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(217, 70, 239, 0.6); }
+        
+        /* Disable keypad when locked */
+        .keypad-locked button { opacity: 0.5; pointer-events: none; }
     </style>
 </head>
 <body class="text-slate-100 min-h-screen flex items-center justify-center p-4 selection:bg-pink-500 selection:text-white">
+
+    <audio id="audio-love" src="https://cdn.pixabay.com/download/audio/2022/02/10/audio_5168e983fb.mp3?filename=romantic-piano-101188.mp3" preload="auto"></audio>
+    <audio id="audio-funny" src="https://cdn.pixabay.com/download/audio/2021/08/04/audio_349d749551.mp3?filename=funny-spring-jump-1-43132.mp3" preload="auto"></audio>
+    <audio id="audio-mystery" src="https://cdn.pixabay.com/download/audio/2021/08/09/audio_6b5c00a635.mp3?filename=suspense-music-114402.mp3" preload="auto"></audio>
 
     <div id="loadingScreen" class="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-50 transition-opacity duration-300">
         <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-pink-500 mb-4"></div>
@@ -70,11 +70,12 @@
                 <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-pink-500/10 text-pink-400 text-2xl mb-3 border border-pink-500/20 shadow-inner">
                     <i class="fa-solid fa-envelope-open-text"></i>
                 </div>
-                <h1 class="text-xl font-bold tracking-tight text-slate-100">Gửi Lời Thì Thầm 💌</h1>
+                <h1 id="creatorTitle" class="text-xl font-bold tracking-tight text-slate-100">Gửi Lời Thì Thầm 💌</h1>
                 <p class="text-xs text-slate-400 mt-1">Viết điều muốn nhắn gửi & thiết lập bảo mật 2 lớp</p>
             </div>
 
             <div id="createForm" class="space-y-4">
+                <input type="hidden" id="editLetterId" value="">
                 
                 <div>
                     <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">1. Chọn giao diện thư</label>
@@ -87,70 +88,100 @@
                 </div>
 
                 <div>
-                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">2. Người nhận</label>
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">2. Font chữ (Nội dung)</label>
+                    <select id="fontInput" class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 outline-none transition">
+                        <option value="font-serif-custom">Cổ điển (Mặc định)</option>
+                        <option value="font-handwriting">Viết tay lãng mạn</option>
+                        <option value="font-modern">Hiện đại rõ nét</option>
+                        <option value="font-pixel">Retro Pixel (Bí ẩn)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">3. Người nhận</label>
                     <input type="text" id="recipientInput" placeholder="Ví dụ: Bé Heo, Vy Vy, Người lạ..." 
-                           class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 placeholder-slate-600 outline-none transition">
+                           class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 outline-none transition">
                 </div>
 
                 <div>
-                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">3. Nội dung bức thư</label>
-                    <textarea id="messageInput" rows="5" placeholder="Ghi những điều bí mật bạn muốn nói với người ấy tại đây..." 
-                              class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 placeholder-slate-600 outline-none transition resize-none"></textarea>
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">4. Nội dung bức thư</label>
+                    <textarea id="messageInput" rows="4" placeholder="Ghi những điều bí mật..." 
+                              class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 outline-none transition resize-none"></textarea>
                 </div>
 
                 <div>
-                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">4. Gợi ý cho lớp bảo mật 1</label>
-                    <input type="text" id="hintInput" placeholder="Ví dụ: Ngày quen nhau?, Sinh nhật?, Ngày kỉ niệm?..." 
-                           class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 placeholder-slate-600 outline-none transition">
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">5. Đính kèm ảnh (Tùy chọn)</label>
+                    <input type="file" id="imageUploadInput" accept="image/*" onchange="handleImageUpload(event)"
+                           class="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-pink-500/10 file:text-pink-400 hover:file:bg-pink-500/20 transition cursor-pointer">
+                    <input type="hidden" id="imageUrlInput" value="">
+                    <p id="uploadStatus" class="text-[10px] text-emerald-400 mt-1 hidden"><i class="fa-solid fa-check"></i> Ảnh đã được tải lên API sẵn sàng!</p>
                 </div>
 
                 <div>
-                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">5. Đáp án lớp bảo mật 1</label>
-                    <input type="text" id="anniversaryInput" placeholder="Ví dụ: 01/09 (Có thể dùng chữ hoặc số)" 
-                           class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 placeholder-slate-600 outline-none transition">
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">6. Gợi ý bảo mật 1</label>
+                    <input type="text" id="hintInput" placeholder="Ví dụ: Ngày quen nhau?..." 
+                           class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 outline-none transition">
                 </div>
 
                 <div>
-                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">6. Lớp bảo mật 2: Mã PIN (Đúng 6 số)</label>
-                    <input type="password" id="pinInput" placeholder="Ví dụ: 121204 (không chứa ký tự chữ)" maxlength="6" pattern="[0-9]*" inputmode="numeric"
-                           class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 placeholder-slate-600 tracking-widest outline-none transition">
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">7. Đáp án bảo mật 1</label>
+                    <input type="text" id="anniversaryInput" placeholder="Ví dụ: 01/09" 
+                           class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 outline-none transition">
                 </div>
 
-                <button onclick="createNewLetter()" class="w-full py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-pink-500/20 flex items-center justify-center gap-2 mt-4">
-                    <i class="fa-solid fa-paper-plane"></i> Tạo Liên Kết Khóa Kép
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">8. Mã PIN (6 số)</label>
+                    <input type="password" id="pinInput" placeholder="Ví dụ: 121204" maxlength="6" pattern="[0-9]*" inputmode="numeric"
+                           class="w-full bg-slate-950/80 border border-slate-800 focus:border-pink-500 rounded-xl px-4 py-2.5 text-xs text-slate-100 tracking-widest outline-none transition">
+                </div>
+
+                <button id="btnSubmitLetter" onclick="submitLetter()" class="w-full py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-pink-500/20 flex items-center justify-center gap-2 mt-4">
+                    <i class="fa-solid fa-paper-plane"></i> <span id="btnSubmitText">Tạo Liên Kết Khóa Kép</span>
+                </button>
+                <button id="btnCancelEdit" onclick="resetCreator()" class="hidden w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl transition mt-2">
+                    Hủy chỉnh sửa
                 </button>
             </div>
 
             <div id="successResult" class="hidden space-y-4 py-4 animate-fade-in">
                 <div class="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
                     <i class="fa-solid fa-circle-check text-emerald-400 text-3xl mb-2"></i>
-                    <h3 class="text-sm font-bold text-emerald-400">Đã Tạo Thư Thành Công!</h3>
-                    <p class="text-[10px] text-slate-400 mt-1">Nội dung thư của bạn đã được niêm phong 2 lớp an toàn.</p>
+                    <h3 class="text-sm font-bold text-emerald-400">Đã Lưu Thư Thành Công!</h3>
                 </div>
 
                 <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
-                    <span class="block text-[10px] font-bold text-slate-500 mb-1">ĐƯỜNG DẪN GỬI CHO NGƯỜI NHẬN:</span>
-                    <input type="text" id="shareUrl" readonly class="w-full bg-transparent text-pink-400 text-xs font-semibold focus:outline-none mb-2 overflow-x-auto">
-                    <button onclick="copyShareLink()" id="btnCopy" class="w-full py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white text-xs font-medium rounded-lg transition flex items-center justify-center gap-1.5">
-                        <i class="fa-regular fa-copy"></i> Sao chép liên kết
-                    </button>
+                    <input type="text" id="shareUrl" readonly class="w-full bg-transparent text-pink-400 text-[10px] font-semibold focus:outline-none mb-2 overflow-x-auto">
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="copyShareLink()" id="btnCopy" class="py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white text-xs font-medium rounded-lg transition flex items-center justify-center gap-1.5">
+                            <i class="fa-regular fa-copy"></i> Copy Link
+                        </button>
+                        <button onclick="shareLetterAPI()" class="py-2 bg-pink-600 hover:bg-pink-500 active:scale-95 text-white text-xs font-medium rounded-lg transition flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-share-nodes"></i> Chia sẻ ngay
+                        </button>
+                    </div>
                 </div>
 
                 <button onclick="resetCreator()" class="w-full py-2.5 border border-slate-800 hover:bg-slate-900 text-slate-400 hover:text-white text-xs font-medium rounded-xl transition">
-                    Viết Một Bức Thư Khác
+                    Về trang chủ / Tạo thư mới
                 </button>
             </div>
 
             <div id="historyBox" class="mt-6 pt-6 border-t border-slate-800/80">
-                <h4 class="text-[11px] font-bold text-slate-500 tracking-wider uppercase mb-3"><i class="fa-solid fa-clock-rotate-left mr-1"></i> Thư bạn đã tạo gần đây</h4>
-                <div id="historyList" class="space-y-2 max-h-[150px] overflow-y-auto pr-1">
-                    <p class="text-[10px] text-slate-600 text-center py-2">Chưa có lịch sử tạo thư.</p>
-                </div>
+                <h4 class="text-[11px] font-bold text-slate-500 tracking-wider uppercase mb-3"><i class="fa-solid fa-clock-rotate-left mr-1"></i> Thư bạn đã tạo</h4>
+                <div id="historyList" class="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                    </div>
             </div>
         </div>
 
 
-        <div id="lockScreen" class="glass-panel rounded-3xl p-8 shadow-2xl hidden">
+        <div id="lockScreen" class="glass-panel rounded-3xl p-8 shadow-2xl hidden relative">
+            <div id="lockoutOverlay" class="absolute inset-0 bg-slate-950/90 rounded-3xl z-20 flex flex-col items-center justify-center hidden backdrop-blur-sm">
+                <i class="fa-solid fa-user-lock text-4xl text-rose-500 mb-3 animate-bounce"></i>
+                <h3 class="text-rose-400 font-bold text-lg">Đã khóa tạm thời!</h3>
+                <p class="text-sm text-slate-300 mt-2">Nhập sai quá 5 lần. Thử lại sau:</p>
+                <div id="lockoutTimer" class="text-3xl font-mono text-white mt-2 font-bold">05:00</div>
+            </div>
+
             <div class="text-center mb-6">
                 <div id="lockIconBox" class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-pink-500/10 text-pink-400 text-3xl mb-4 border border-pink-500/20 shadow-inner transition-colors duration-300">
                     <i id="lockIcon" class="fa-solid fa-lock"></i>
@@ -162,7 +193,7 @@
             <div id="anniversaryCheckContainer" class="mb-6 max-w-[280px] mx-auto">
                 <label id="readerHintLabel" class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 text-center">Bảo mật 1: Gợi ý</label>
                 <input type="text" id="readerAnniversaryInput" placeholder="Nhập đáp án của bạn..." 
-                       class="w-full bg-slate-900 border border-slate-700 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 rounded-xl px-4 py-3 text-center text-sm font-semibold text-slate-100 placeholder-slate-500 outline-none transition shadow-inner">
+                       class="w-full bg-slate-900 border border-slate-700 focus:border-pink-500 rounded-xl px-4 py-3 text-center text-sm font-semibold text-slate-100 outline-none transition shadow-inner">
             </div>
 
             <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 text-center">Bảo mật 2: Mã PIN 6 Số</label>
@@ -175,7 +206,7 @@
                 <span class="pin-dot w-4 h-4 rounded-full border border-slate-600 bg-slate-800"></span>
             </div>
 
-            <div class="grid grid-cols-3 gap-4 max-w-[280px] mx-auto mb-4">
+            <div id="keypadBox" class="grid grid-cols-3 gap-4 max-w-[280px] mx-auto mb-4">
                 <button onclick="pressKey('1')" class="h-14 w-14 rounded-full bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/30 text-lg font-semibold transition active:scale-95 focus:outline-none">1</button>
                 <button onclick="pressKey('2')" class="h-14 w-14 rounded-full bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/30 text-lg font-semibold transition active:scale-95 focus:outline-none">2</button>
                 <button onclick="pressKey('3')" class="h-14 w-14 rounded-full bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/30 text-lg font-semibold transition active:scale-95 focus:outline-none">3</button>
@@ -187,14 +218,11 @@
                 <button onclick="pressKey('9')" class="h-14 w-14 rounded-full bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/30 text-lg font-semibold transition active:scale-95 focus:outline-none">9</button>
                 <button onclick="clearPin()" class="h-14 w-14 rounded-full text-slate-400 hover:text-rose-400 text-sm font-medium transition active:scale-95 focus:outline-none">C</button>
                 <button onclick="pressKey('0')" class="h-14 w-14 rounded-full bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/30 text-lg font-semibold transition active:scale-95 focus:outline-none">0</button>
-                <button onclick="deleteLast()" class="h-14 w-14 rounded-full text-slate-400 hover:text-amber-400 transition active:scale-95 focus:outline-none">
-                    <i class="fa-solid fa-delete-left"></i>
-                </button>
+                <button onclick="deleteLast()" class="h-14 w-14 rounded-full text-slate-400 hover:text-amber-400 transition active:scale-95 focus:outline-none"><i class="fa-solid fa-delete-left"></i></button>
             </div>
             
             <p id="errorMsg" class="text-center text-xs text-rose-400 font-medium h-4 mt-2"></p>
         </div>
-
 
         <div id="letterScreen" class="glass-panel rounded-3xl p-8 shadow-2xl hidden relative overflow-hidden animate-fade-in">
             <div id="bgDeco" class="absolute -top-6 -right-6 text-pink-500/10 text-8xl pointer-events-none select-none transition-colors duration-500">
@@ -209,7 +237,9 @@
             </div>
 
             <div class="bg-slate-950/50 p-5 rounded-2xl border border-slate-800/50 mb-6 relative z-10 shadow-inner">
-                <p id="letterContent" class="text-sm text-slate-300 leading-relaxed font-serif-custom italic whitespace-pre-line">
+                <img id="letterImage" src="" alt="Ảnh đính kèm" class="w-full rounded-xl mb-4 hidden border border-slate-700">
+                
+                <p id="letterContent" class="text-sm text-slate-300 leading-relaxed font-serif-custom whitespace-pre-line">
                     ...
                 </p>
             </div>
@@ -218,10 +248,9 @@
                 <a href="/" class="w-full py-3 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white text-xs font-bold rounded-xl transition shadow-lg flex items-center justify-center gap-2 border border-slate-700">
                     <i class="fa-solid fa-pen-nib"></i> Tạo thư khóa PIN của riêng bạn
                 </a>
-                <p class="text-[9px] text-center text-slate-500 tracking-wider">THƯ SẼ TỰ ĐỘNG KHÓA LẠI KHI BẠN TẮT TRANG WEB NÀY</p>
+                <p class="text-[9px] text-center text-slate-500 tracking-wider">THƯ SẼ TỰ ĐỘNG KHÓA LẠI KHI BẠN TẮT TRANG WEB</p>
             </div>
         </div>
-
     </div>
 
     <script>
@@ -235,52 +264,48 @@
             appId: "1:508563399846:web:d5fb08bf1f383ebd340067",
             measurementId: "G-MX3C9T3YTK"
         };
-
-        // Khởi tạo Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // Biến trạng thái
+        // Cấp phát Creator Token để xác thực quyền Xóa/Sửa
+        let myCreatorToken = localStorage.getItem('creatorToken');
+        if (!myCreatorToken) {
+            myCreatorToken = Math.random().toString(36).substr(2, 10) + Date.now().toString(36);
+            localStorage.setItem('creatorToken', myCreatorToken);
+        }
+
         let currentPinInput = "";
         let secretLetterId = null; 
-        let loadedLetterData = null; 
+        let loadedLetterData = null;
+        let lockoutInterval = null; 
 
-        // 2. Chạy khi mở trang để phân tích đường dẫn URL
+        // Khởi động trang
         async function initPage() {
             const urlParams = new URLSearchParams(window.location.search);
             secretLetterId = urlParams.get('id');
 
             if (secretLetterId) {
-                // CHẾ ĐỘ NGƯỜI NHẬN: Link có ID, yêu cầu nhập bảo mật 2 lớp
                 try {
                     const doc = await db.collection("messages").doc(secretLetterId).get();
                     if (doc.exists) {
                         loadedLetterData = doc.data();
                         
-                        // Áp dụng Theme giao diện từ Database
-                        const theme = loadedLetterData.theme || 'love';
-                        applyThemeToViewer(theme);
-
-                        // Hỗ trợ thư cũ và hiển thị gợi ý bảo mật 1
-                        if (!loadedLetterData.anniversary) {
-                            document.getElementById("anniversaryCheckContainer").classList.add("hidden");
-                        } else {
-                            // Nếu người gửi có thiết lập Gợi ý (hint), hiển thị nó ra. Nếu thư cũ không có hint, dùng mặc định
-                            document.getElementById("readerHintLabel").innerText = loadedLetterData.hint ? `Bảo mật 1: ${loadedLetterData.hint}` : "Bảo mật 1: Kỷ niệm / Ngày quen nhau";
-                        }
-
+                        applyThemeToViewer(loadedLetterData.theme || 'love');
+                        document.getElementById("readerHintLabel").innerText = loadedLetterData.hint ? `Bảo mật 1: ${loadedLetterData.hint}` : "Bảo mật 1: Kỷ niệm";
+                        
                         hideLoading();
                         document.getElementById("lockScreen").classList.remove("hidden");
+                        
+                        // Kiểm tra xem user này có đang bị khóa (nhập sai 5 lần) không
+                        checkLockoutState();
                     } else {
-                        alert("Thư bí mật này không tồn tại hoặc đã bị người gửi xóa!");
+                        alert("Thư bí mật này không tồn tại hoặc đã bị người gửi thu hồi!");
                         window.location.href = window.location.origin;
                     }
                 } catch (error) {
-                    console.error("Lỗi khi kết nối Firestore: ", error);
-                    alert("Có lỗi xảy ra khi tải thư. Hãy tải lại trang!");
+                    alert("Lỗi tải thư. Hãy thử lại!");
                 }
             } else {
-                // CHẾ ĐỘ NGƯỜI VIẾT: Truy cập trang chủ để tạo thư
                 hideLoading();
                 document.getElementById("creatorScreen").classList.remove("hidden");
                 loadHistory();
@@ -288,37 +313,20 @@
         }
 
         function hideLoading() {
-            const loading = document.getElementById('loadingScreen');
-            loading.classList.add('opacity-0');
-            setTimeout(() => loading.classList.add('hidden'), 300);
+            document.getElementById('loadingScreen').classList.add('hidden');
         }
 
-        // Chọn theme ở màn hình người viết
+        // ĐỔI THEME
         function selectTheme(theme) {
             document.getElementById('themeInput').value = theme;
-            
-            const btns = {
-                'love': document.getElementById('btn-theme-love'),
-                'funny': document.getElementById('btn-theme-funny'),
-                'mystery': document.getElementById('btn-theme-mystery')
-            };
-
-            // Reset tất cả nút về trạng thái mờ
-            btns['love'].className = "theme-select-btn py-2 rounded-xl text-[11px] font-bold transition border-2 border-slate-700 bg-slate-800/80 text-pink-400 opacity-60 hover:opacity-100";
-            btns['funny'].className = "theme-select-btn py-2 rounded-xl text-[11px] font-bold transition border-2 border-slate-700 bg-slate-800/80 text-amber-400 opacity-60 hover:opacity-100";
-            btns['mystery'].className = "theme-select-btn py-2 rounded-xl text-[11px] font-bold transition border-2 border-slate-700 bg-slate-800/80 text-emerald-400 opacity-60 hover:opacity-100";
-
-            // Highlight nút được chọn
-            if (theme === 'love') {
-                btns['love'].className = "theme-select-btn py-2 rounded-xl text-[11px] font-bold transition border-2 border-pink-500 bg-pink-500/20 text-pink-400";
-            } else if (theme === 'funny') {
-                btns['funny'].className = "theme-select-btn py-2 rounded-xl text-[11px] font-bold transition border-2 border-amber-500 bg-amber-500/20 text-amber-400";
-            } else if (theme === 'mystery') {
-                btns['mystery'].className = "theme-select-btn py-2 rounded-xl text-[11px] font-bold transition border-2 border-emerald-500 bg-emerald-500/20 text-emerald-400";
-            }
+            ['love', 'funny', 'mystery'].forEach(t => {
+                const btn = document.getElementById(`btn-theme-${t}`);
+                btn.className = `theme-select-btn py-2 rounded-xl text-[11px] font-bold transition border-2 border-slate-700 bg-slate-800/80 opacity-60 text-${t==='love'?'pink':(t==='funny'?'amber':'emerald')}-400`;
+            });
+            const activeBtn = document.getElementById(`btn-theme-${theme}`);
+            activeBtn.className = `theme-select-btn py-2 rounded-xl text-[11px] font-bold transition border-2 bg-${theme==='love'?'pink':(theme==='funny'?'amber':'emerald')}-500/20 border-${theme==='love'?'pink':(theme==='funny'?'amber':'emerald')}-500 text-${theme==='love'?'pink':(theme==='funny'?'amber':'emerald')}-400`;
         }
 
-        // Áp dụng Theme hiển thị ra trình duyệt
         function applyThemeToViewer(theme) {
             const root = document.documentElement;
             const bgDeco = document.getElementById('bgDeco');
@@ -328,125 +336,159 @@
             const letterHeaderIcon = document.getElementById('letterHeaderIcon');
 
             if (theme === 'love') {
-                root.style.setProperty('--theme-color', '#d946ef'); // fuchsia/pink
+                root.style.setProperty('--theme-color', '#d946ef');
                 root.style.setProperty('--theme-shadow', '#f0abfc');
-                root.style.setProperty('--bg-gradient-start', '#2e1065'); // deep purple
-                
+                root.style.setProperty('--bg-gradient-start', '#2e1065');
                 lockIconBox.className = 'inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-pink-500/10 text-pink-400 text-3xl mb-4 border border-pink-500/20 shadow-inner';
                 lockIcon.className = 'fa-solid fa-lock';
-                bgDeco.className = 'absolute -top-6 -right-6 text-pink-500/10 text-8xl pointer-events-none select-none';
                 bgDeco.innerHTML = '<i class="fa-solid fa-heart"></i>';
+                bgDeco.className = 'absolute -top-6 -right-6 text-pink-500/10 text-8xl';
                 letterHeader.className = 'flex items-center gap-2 text-pink-400 text-xs font-bold tracking-widest uppercase';
                 letterHeaderIcon.className = 'fa-solid fa-envelope animate-pulse';
-
             } else if (theme === 'funny') {
-                root.style.setProperty('--theme-color', '#f59e0b'); // amber
-                root.style.setProperty('--theme-shadow', '#fcd34d');
-                root.style.setProperty('--bg-gradient-start', '#78350f'); // deep brown/orange
-                
-                lockIconBox.className = 'inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-400 text-3xl mb-4 border border-amber-500/20 shadow-inner';
+                root.style.setProperty('--theme-color', '#f59e0b');
+                root.style.setProperty('--bg-gradient-start', '#78350f');
+                lockIconBox.className = 'inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-400 text-3xl mb-4 border border-amber-500/20';
                 lockIcon.className = 'fa-solid fa-face-grin-stars';
-                bgDeco.className = 'absolute -top-6 -right-6 text-amber-500/10 text-8xl pointer-events-none select-none';
                 bgDeco.innerHTML = '<i class="fa-solid fa-face-laugh-squint"></i>';
+                bgDeco.className = 'absolute -top-6 -right-6 text-amber-500/10 text-8xl';
                 letterHeader.className = 'flex items-center gap-2 text-amber-400 text-xs font-bold tracking-widest uppercase';
                 letterHeaderIcon.className = 'fa-solid fa-face-grin-tears animate-bounce';
-
             } else if (theme === 'mystery') {
-                root.style.setProperty('--theme-color', '#10b981'); // emerald
-                root.style.setProperty('--theme-shadow', '#6ee7b7');
-                root.style.setProperty('--bg-gradient-start', '#064e3b'); // deep green
-                
-                lockIconBox.className = 'inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-500/10 text-emerald-400 text-3xl mb-4 border border-emerald-500/20 shadow-inner';
+                root.style.setProperty('--theme-color', '#10b981');
+                root.style.setProperty('--bg-gradient-start', '#064e3b');
+                lockIconBox.className = 'inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-500/10 text-emerald-400 text-3xl mb-4 border border-emerald-500/20';
                 lockIcon.className = 'fa-solid fa-user-secret';
-                bgDeco.className = 'absolute -top-6 -right-6 text-emerald-500/10 text-8xl pointer-events-none select-none';
                 bgDeco.innerHTML = '<i class="fa-solid fa-mask"></i>';
+                bgDeco.className = 'absolute -top-6 -right-6 text-emerald-500/10 text-8xl';
                 letterHeader.className = 'flex items-center gap-2 text-emerald-400 text-xs font-bold tracking-widest uppercase';
                 letterHeaderIcon.className = 'fa-solid fa-hat-wizard animate-pulse';
             }
         }
 
+        // TẢI ẢNH QUA API ĐỂ TRÁNH CORS
+        async function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if(!file) return;
+            
+            const formData = new FormData();
+            formData.append('image', file);
 
-        // 3. XỬ LÝ CHẾ ĐỘ NGƯỜI VIẾT (TẠO THƯ)
-        async function createNewLetter() {
-            const recipient = document.getElementById("recipientInput").value.trim();
-            const message = document.getElementById("messageInput").value.trim();
-            const pin = document.getElementById("pinInput").value.trim();
-            const hint = document.getElementById("hintInput").value.trim();
-            const anniversary = document.getElementById("anniversaryInput").value.trim();
-            const theme = document.getElementById("themeInput").value;
-
-            if (!recipient || !message || !pin || !anniversary || !hint) {
-                alert("Vui lòng điền đầy đủ: Người nhận, Nội dung thư, Gợi ý, Đáp án và Mã PIN!");
-                return;
-            }
-
-            if (pin.length !== 6 || isNaN(pin)) {
-                alert("Mã PIN bảo mật phải chứa đúng 6 ký số liên tiếp!");
-                return;
-            }
+            document.getElementById('uploadStatus').classList.remove('hidden');
+            document.getElementById('uploadStatus').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đẩy ảnh lên Server...';
 
             try {
-                // Lưu thư vào collection mang tên "messages"
-                const docRef = await db.collection("messages").add({
-                    recipient: recipient,
-                    content: message,
-                    pin: pin,
-                    anniversary: anniversary,
-                    hint: hint,
-                    theme: theme,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-
-                // Tự động sinh ra URL liên kết thích hợp 
-                const shareLink = `${window.location.origin}${window.location.pathname}?id=${docRef.id}`;
+                // Gọi API Route của bạn trên Vercel
+                const response = await fetch('/api/upload-image', { method: 'POST', body: formData });
+                const data = await response.json();
                 
-                // Hiển thị kết quả link chia sẻ
-                document.getElementById("shareUrl").value = shareLink;
-                document.getElementById("createForm").classList.add("hidden");
-                document.getElementById("successResult").classList.remove("hidden");
-
-                // Lưu thư đã tạo vào bộ nhớ trình duyệt để đề phòng quên copy link
-                saveToLocalHistory(recipient, shareLink);
-
-            } catch (error) {
-                console.error("Lỗi tạo thư trên Firebase: ", error);
-                alert("Không thể lưu thư mật. Hãy chắc chắn bạn đã kích hoạt Firestore và chỉnh Rules sang True!");
+                if (data.url) {
+                    document.getElementById('imageUrlInput').value = data.url;
+                    document.getElementById('uploadStatus').innerHTML = '<i class="fa-solid fa-check"></i> Ảnh đã tải lên thành công!';
+                } else {
+                    throw new Error("Không nhận được URL");
+                }
+            } catch (err) {
+                console.error(err);
+                document.getElementById('uploadStatus').innerHTML = '<i class="fa-solid fa-xmark text-rose-400"></i> Lỗi upload, vui lòng thử lại.';
             }
         }
 
+        // TẠO HOẶC CẬP NHẬT THƯ
+        async function submitLetter() {
+            const editId = document.getElementById("editLetterId").value;
+            const payload = {
+                theme: document.getElementById("themeInput").value,
+                font: document.getElementById("fontInput").value,
+                recipient: document.getElementById("recipientInput").value.trim(),
+                content: document.getElementById("messageInput").value.trim(),
+                imageUrl: document.getElementById("imageUrlInput").value,
+                hint: document.getElementById("hintInput").value.trim(),
+                anniversary: document.getElementById("anniversaryInput").value.trim(),
+                pin: document.getElementById("pinInput").value.trim(),
+                creatorToken: myCreatorToken // Để xác thực quyền sở hữu khi xóa/sửa
+            };
+
+            if (!payload.recipient || !payload.content || !payload.pin || !payload.anniversary || !payload.hint) {
+                alert("Vui lòng điền đủ các trường bắt buộc!"); return;
+            }
+            if (payload.pin.length !== 6 || isNaN(payload.pin)) {
+                alert("Mã PIN phải đúng 6 số!"); return;
+            }
+
+            try {
+                let docId = editId;
+                if (editId) {
+                    // Update
+                    await db.collection("messages").doc(editId).update(payload);
+                } else {
+                    // Create
+                    payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    const docRef = await db.collection("messages").add(payload);
+                    docId = docRef.id;
+                }
+
+                const shareLink = `${window.location.origin}${window.location.pathname}?id=${docId}`;
+                document.getElementById("shareUrl").value = shareLink;
+                
+                document.getElementById("createForm").classList.add("hidden");
+                document.getElementById("successResult").classList.remove("hidden");
+                
+                if(!editId) saveToLocalHistory(docId, payload.recipient, shareLink);
+
+            } catch (error) {
+                alert("Lỗi hệ thống. Không thể lưu thư!");
+            }
+        }
+
+        // TÍNH NĂNG CHIA SẺ NHANH (Web Share API)
+        async function shareLetterAPI() {
+            const shareUrl = document.getElementById("shareUrl").value;
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'Hộp Thư Bí Mật 💌',
+                        text: 'Tớ vừa gửi cho cậu một bí mật tại đây, đố cậu mở khóa được đấy! 😉',
+                        url: shareUrl
+                    });
+                } catch (err) { console.log('User cancelled share'); }
+            } else {
+                alert("Trình duyệt của bạn không hỗ trợ tính năng chia sẻ nhanh!");
+            }
+        }
+
+        function copyShareLink() {
+            const copyText = document.getElementById("shareUrl");
+            copyText.select(); navigator.clipboard.writeText(copyText.value);
+            const btn = document.getElementById("btnCopy");
+            btn.innerHTML = `<i class="fa-solid fa-check"></i> Đã Copy`;
+            setTimeout(() => btn.innerHTML = `<i class="fa-regular fa-copy"></i> Copy Link`, 2000);
+        }
+
         function resetCreator() {
+            document.getElementById("editLetterId").value = "";
+            document.getElementById("btnSubmitText").innerText = "Tạo Liên Kết Khóa Kép";
+            document.getElementById("btnCancelEdit").classList.add("hidden");
+            document.getElementById("creatorTitle").innerText = "Gửi Lời Thì Thầm 💌";
+            
             document.getElementById("recipientInput").value = "";
             document.getElementById("messageInput").value = "";
+            document.getElementById("imageUrlInput").value = "";
+            document.getElementById("uploadStatus").classList.add("hidden");
             document.getElementById("pinInput").value = "";
             document.getElementById("hintInput").value = "";
             document.getElementById("anniversaryInput").value = "";
+            
             document.getElementById("successResult").classList.add("hidden");
             document.getElementById("createForm").classList.remove("hidden");
             loadHistory();
         }
 
-        function copyShareLink() {
-            const copyText = document.getElementById("shareUrl");
-            copyText.select();
-            copyText.setSelectionRange(0, 99999);
-            navigator.clipboard.writeText(copyText.value);
-
-            const btn = document.getElementById("btnCopy");
-            btn.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i> Đã sao chép!`;
-            btn.classList.add("bg-slate-900");
-
-            setTimeout(() => {
-                btn.innerHTML = `<i class="fa-regular fa-copy"></i> Sao chép liên kết`;
-                btn.classList.remove("bg-slate-900");
-            }, 2000);
-        }
-
-        // Quản lý lưu trữ lịch sử ở localStorage
-        function saveToLocalHistory(recipient, url) {
+        // LỊCH SỬ & SỬA & XÓA THƯ
+        function saveToLocalHistory(id, recipient, url) {
             let history = JSON.parse(localStorage.getItem("letter_history")) || [];
-            history.unshift({ recipient, url, time: new Date().toLocaleDateString("vi-VN") });
-            history = history.slice(0, 5); // Giới hạn lưu tối đa 5 thư gần nhất
-            localStorage.setItem("letter_history", JSON.stringify(history));
+            history.unshift({ id, recipient, url, time: new Date().toLocaleDateString("vi-VN") });
+            localStorage.setItem("letter_history", JSON.stringify(history.slice(0, 10)));
         }
 
         function loadHistory() {
@@ -454,112 +496,183 @@
             const history = JSON.parse(localStorage.getItem("letter_history")) || [];
             
             if (history.length === 0) {
-                container.innerHTML = `<p class="text-[10px] text-slate-600 text-center py-2">Chưa có lịch sử tạo thư.</p>`;
-                return;
+                container.innerHTML = `<p class="text-[10px] text-slate-600 text-center py-2">Chưa có lịch sử.</p>`; return;
             }
 
             container.innerHTML = history.map(item => `
-                <div class="flex items-center justify-between p-2 rounded-lg bg-slate-950/40 border border-slate-900 text-[11px]">
-                    <div class="truncate pr-2">
+                <div class="p-2 rounded-lg bg-slate-950/40 border border-slate-900 text-[11px] flex justify-between items-center" id="hist-${item.id}">
+                    <div>
                         <span class="text-pink-400 font-medium">Đến: ${item.recipient}</span>
                         <span class="block text-[9px] text-slate-600">${item.time}</span>
                     </div>
-                    <a href="${item.url}" target="_blank" class="px-2 py-1 bg-slate-900 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition">
-                        <i class="fa-solid fa-link text-[9px]"></i> Xem lại
-                    </a>
+                    <div class="flex gap-1">
+                        <button onclick="editLetter('${item.id}')" class="px-2 py-1 bg-slate-800 text-amber-400 rounded hover:bg-slate-700 transition"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteLetter('${item.id}')" class="px-2 py-1 bg-slate-800 text-rose-400 rounded hover:bg-rose-900/50 transition"><i class="fa-solid fa-trash"></i></button>
+                        <a href="${item.url}" target="_blank" class="px-2 py-1 bg-slate-800 text-slate-400 rounded hover:text-white transition"><i class="fa-solid fa-link"></i></a>
+                    </div>
                 </div>
             `).join('');
         }
 
+        async function editLetter(id) {
+            try {
+                const doc = await db.collection("messages").doc(id).get();
+                if (doc.exists && doc.data().creatorToken === myCreatorToken) {
+                    const data = doc.data();
+                    document.getElementById("editLetterId").value = id;
+                    document.getElementById("themeInput").value = data.theme;
+                    selectTheme(data.theme);
+                    document.getElementById("fontInput").value = data.font || 'font-serif-custom';
+                    document.getElementById("recipientInput").value = data.recipient;
+                    document.getElementById("messageInput").value = data.content;
+                    document.getElementById("hintInput").value = data.hint;
+                    document.getElementById("anniversaryInput").value = data.anniversary;
+                    document.getElementById("pinInput").value = data.pin;
+                    
+                    document.getElementById("creatorTitle").innerText = "Chỉnh sửa Thư ✏️";
+                    document.getElementById("btnSubmitText").innerText = "Cập nhật Thư";
+                    document.getElementById("btnCancelEdit").classList.remove("hidden");
+                    window.scrollTo(0, 0);
+                } else {
+                    alert("Bạn không có quyền sửa thư này (Thư được tạo từ thiết bị khác).");
+                }
+            } catch (e) { alert("Lỗi tải dữ liệu!"); }
+        }
 
-        // 4. LOGIC NHẬP PHÍM BẰNG BÀN PHÍM ẢO (KHÓA PIN 6 SỐ)
+        async function deleteLetter(id) {
+            if(confirm("Bạn có chắc chắn muốn thu hồi/xóa bức thư này? Người nhận sẽ không thể xem được nữa.")) {
+                try {
+                    const doc = await db.collection("messages").doc(id).get();
+                    if(doc.exists && doc.data().creatorToken === myCreatorToken) {
+                        await db.collection("messages").doc(id).delete();
+                        let history = JSON.parse(localStorage.getItem("letter_history")) || [];
+                        history = history.filter(item => item.id !== id);
+                        localStorage.setItem("letter_history", JSON.stringify(history));
+                        document.getElementById(`hist-${id}`).remove();
+                        alert("Đã thu hồi thư thành công!");
+                    } else {
+                        alert("Bạn không có quyền xóa thư này!");
+                    }
+                } catch(e) { alert("Lỗi khi xóa!"); }
+            }
+        }
+
+
+        // LOGIC KHÓA MÃ PIN & GIỚI HẠN 5 PHÚT
+        function checkLockoutState() {
+            const lockKey = `lock_${secretLetterId}`;
+            const lockUntil = localStorage.getItem(lockKey);
+            
+            if (lockUntil && Date.now() < parseInt(lockUntil)) {
+                enableLockoutUI(parseInt(lockUntil));
+            }
+        }
+
+        function enableLockoutUI(lockUntil) {
+            document.getElementById("keypadBox").classList.add("keypad-locked");
+            document.getElementById("lockoutOverlay").classList.remove("hidden");
+            
+            lockoutInterval = setInterval(() => {
+                const now = Date.now();
+                if (now >= lockUntil) {
+                    clearInterval(lockoutInterval);
+                    localStorage.removeItem(`lock_${secretLetterId}`);
+                    localStorage.removeItem(`attempts_${secretLetterId}`);
+                    document.getElementById("keypadBox").classList.remove("keypad-locked");
+                    document.getElementById("lockoutOverlay").classList.add("hidden");
+                } else {
+                    const remaining = Math.floor((lockUntil - now) / 1000);
+                    const m = String(Math.floor(remaining / 60)).padStart(2, '0');
+                    const s = String(remaining % 60).padStart(2, '0');
+                    document.getElementById("lockoutTimer").innerText = `${m}:${s}`;
+                }
+            }, 1000);
+        }
+
         function pressKey(num) {
             if (currentPinInput.length < 6) {
-                currentPinInput += num;
-                updatePinDots();
-                
-                if (currentPinInput.length === 6) {
-                    setTimeout(validatePin, 200);
-                }
+                currentPinInput += num; updatePinDots();
+                if (currentPinInput.length === 6) setTimeout(validatePin, 200);
             }
         }
-
-        function deleteLast() {
-            if (currentPinInput.length > 0) {
-                currentPinInput = currentPinInput.slice(0, -1);
-                updatePinDots();
-                document.getElementById("errorMsg").innerText = "";
-            }
-        }
-
-        function clearPin() {
-            currentPinInput = "";
-            updatePinDots();
-            document.getElementById("errorMsg").innerText = "";
-        }
-
+        function deleteLast() { if (currentPinInput.length > 0) { currentPinInput = currentPinInput.slice(0, -1); updatePinDots(); document.getElementById("errorMsg").innerText = ""; } }
+        function clearPin() { currentPinInput = ""; updatePinDots(); document.getElementById("errorMsg").innerText = ""; }
         function updatePinDots() {
             const dots = document.querySelectorAll('.pin-dot');
-            dots.forEach((dot, index) => {
-                if (index < currentPinInput.length) {
-                    dot.classList.add('active');
-                } else {
-                    dot.classList.remove('active');
-                }
-            });
+            dots.forEach((dot, idx) => dot.classList[idx < currentPinInput.length ? 'add' : 'remove']('active'));
         }
 
-        // Xác thực mã PIN và Lớp bảo mật 1
         function validatePin() {
             const errorMsg = document.getElementById("errorMsg");
-            const dots = document.querySelectorAll('.pin-dot');
-            const readerAnniversary = document.getElementById("readerAnniversaryInput").value.trim();
-            const expectedAnniversary = loadedLetterData.anniversary || "";
-
-            // Kiểm tra khớp thông tin Lớp bảo mật 1 (nếu có thiết lập)
-            let isAnniversaryCorrect = true;
-            if (expectedAnniversary !== "") {
-                // Chuyển về chữ thường để so sánh không phân biệt hoa/thường
-                isAnniversaryCorrect = (readerAnniversary.toLowerCase() === expectedAnniversary.toLowerCase());
-            }
+            const readerAnniversary = document.getElementById("readerAnniversaryInput").value.trim().toLowerCase();
+            const expectedAnniversary = (loadedLetterData.anniversary || "").toLowerCase();
+            const isAnniversaryCorrect = readerAnniversary === expectedAnniversary;
 
             if (currentPinInput === loadedLetterData.pin && isAnniversaryCorrect) {
-                // BẢO MẬT KÉP CHÍNH XÁC ➔ Tiến hành mở phong thư
+                // Xóa log nhập sai
+                localStorage.removeItem(`attempts_${secretLetterId}`);
+                
+                // Mở thư
                 document.getElementById("lockScreen").classList.add("hidden");
-                
                 document.getElementById("letterFor").innerText = `Gửi ${loadedLetterData.recipient} ✨`;
-                document.getElementById("letterContent").innerText = loadedLetterData.content;
                 
-                document.getElementById("letterScreen").classList.remove("hidden");
-            } else {
-                // SAI THÔNG TIN ➔ Báo lỗi và reset
-                if (!isAnniversaryCorrect) {
-                    errorMsg.innerText = "Lỗi: Đáp án cho Lớp bảo mật 1 chưa chính xác!";
-                    const aniInput = document.getElementById("readerAnniversaryInput");
-                    aniInput.classList.add("border-rose-500", "ring-1", "ring-rose-500");
-                    setTimeout(() => aniInput.classList.remove("border-rose-500", "ring-1", "ring-rose-500"), 1500);
-                } else {
-                    errorMsg.innerText = "Lỗi: Mã PIN 6 số không chính xác!";
+                const contentEl = document.getElementById("letterContent");
+                contentEl.innerText = loadedLetterData.content;
+                contentEl.className = `text-sm text-slate-300 leading-relaxed whitespace-pre-line ${loadedLetterData.font || 'font-serif-custom'}`;
+                
+                if(loadedLetterData.imageUrl) {
+                    const img = document.getElementById("letterImage");
+                    img.src = loadedLetterData.imageUrl;
+                    img.classList.remove("hidden");
                 }
                 
-                // Báo đỏ các chấm PIN
-                dots.forEach(dot => {
-                    dot.style.backgroundColor = '#f43f5e'; // rose-500
-                    dot.style.borderColor = '#f43f5e';
-                    dot.style.boxShadow = 'none';
-                });
-
-                setTimeout(() => {
-                    dots.forEach(dot => {
-                        dot.style.backgroundColor = '';
-                        dot.style.borderColor = '';
-                    });
-                    clearPin();
-                }, 700);
+                document.getElementById("letterScreen").classList.remove("hidden");
+                triggerEffects(loadedLetterData.theme || 'love'); // Bắn hiệu ứng
+            } else {
+                // Xử lý đếm số lần sai
+                let attempts = parseInt(localStorage.getItem(`attempts_${secretLetterId}`) || 0) + 1;
+                localStorage.setItem(`attempts_${secretLetterId}`, attempts);
+                
+                if(attempts >= 5) {
+                    const lockTime = Date.now() + 5 * 60 * 1000; // 5 phút
+                    localStorage.setItem(`lock_${secretLetterId}`, lockTime);
+                    enableLockoutUI(lockTime);
+                    errorMsg.innerText = "";
+                } else {
+                    errorMsg.innerText = !isAnniversaryCorrect ? "Lớp bảo mật 1 sai!" : `Mã PIN sai! Bạn còn ${5 - attempts} lần.`;
+                    const dots = document.querySelectorAll('.pin-dot');
+                    dots.forEach(dot => { dot.style.backgroundColor = '#f43f5e'; dot.style.borderColor = '#f43f5e'; dot.style.boxShadow = 'none'; });
+                    setTimeout(() => { dots.forEach(dot => { dot.style.backgroundColor = ''; dot.style.borderColor = ''; }); clearPin(); }, 700);
+                }
             }
         }
 
-        // Chạy khởi động hệ thống
+        // TẠO HIỆU ỨNG & PHÁT NHẠC
+        function triggerEffects(theme) {
+            try {
+                // Phát nhạc tương ứng (người dùng vừa bấm nút xong nên trình duyệt sẽ cho phép phát nhạc)
+                const audio = document.getElementById(`audio-${theme}`);
+                if(audio) {
+                    audio.volume = 0.5;
+                    audio.play().catch(e => console.log("Không thể tự động phát nhạc:", e));
+                }
+                
+                // Hiệu ứng pháo hoa Confetti
+                if (theme === 'love') {
+                    const duration = 3000; const end = Date.now() + duration;
+                    (function frame() {
+                        confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#ec4899', '#fbcfe8'] });
+                        confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#ec4899', '#fbcfe8'] });
+                        if (Date.now() < end) requestAnimationFrame(frame);
+                    }());
+                } else if (theme === 'funny') {
+                    confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 }, colors: ['#f59e0b', '#fbbf24'] });
+                } else if (theme === 'mystery') {
+                    confetti({ particleCount: 100, startVelocity: 30, spread: 360, ticks: 60, zIndex: 0, colors: ['#10b981', '#059669'] });
+                }
+            } catch(e) {}
+        }
+
         window.onload = initPage;
     </script>
 </body>
