@@ -729,11 +729,16 @@
             if (currentPinInput === loadedLetterData.pin) {
                 localStorage.removeItem(`attempts_${secretLetterId}`);
                 
-                if (!loadedLetterData.isRead && loadedLetterData.creatorToken !== myCreatorToken) {
-                    db.collection("messages").doc(secretLetterId).update({
-                        isRead: true, readAt: new Date().toISOString()
-                    }).catch(e => console.error("Lỗi cập nhật Read status:", e));
-                }
+                // Chỉ cần kiểm tra xem thư chưa đọc hay không
+if (!loadedLetterData.isRead) {
+    db.collection("messages").doc(secretLetterId).update({
+        isRead: true, 
+        readAt: new Date().toISOString()
+    })
+    .then(() => console.log("Đã cập nhật isRead thành công"))
+    .catch(e => console.error("Lỗi cập nhật Firestore:", e));
+}
+
 
                 document.getElementById("lockScreen").classList.add("hidden");
                 document.getElementById("letterFor").innerText = `Gửi ${loadedLetterData.recipient} ✨`;
